@@ -2,9 +2,9 @@
 """
 frame_at.py — zoom into a video: full-resolution frames at given instants or over a dense window.
 
-  python3 frame_at.py v2s_work 1:23 2:05.5          # frames at 1:23 and 2:05.5
-  python3 frame_at.py v2s_work --window 1:20 1:30 --step 1   # one frame per second
-  python3 frame_at.py v2s_work 1:23 --crop 0,0.5,1,0.5        # x,y,w,h as fractions (bottom half)
+  python frame_at.py v2s_work 1:23 2:05.5          # frames at 1:23 and 2:05.5
+  python frame_at.py v2s_work --window 1:20 1:30 --step 1   # one frame per second
+  python frame_at.py v2s_work 1:23 --crop 0,0.5,1,0.5        # x,y,w,h as fractions (bottom half)
 
 Writes to <work>/zoom/ and prints the file paths (read them with your image viewer / Read tool).
 """
@@ -12,6 +12,9 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _common import ensure_ffmpeg, utf8_console  # noqa: E402
 
 
 def parse_t(s):
@@ -30,6 +33,9 @@ def main():
     ap.add_argument("--step", type=float, default=1.0)
     ap.add_argument("--crop", default=None, help="x,y,w,h en fractions de l'image")
     a = ap.parse_args()
+    utf8_console()
+    if not all(ensure_ffmpeg()):
+        sys.exit("ffmpeg manquant : python scripts/setup.py")
 
     work = Path(a.work)
     vids = [p for p in work.glob("video.*") if p.suffix.lower() in (".mp4", ".mkv", ".webm", ".mov", ".m4v", ".avi")]

@@ -13,13 +13,24 @@ import sys
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+from _common import ensure_ffmpeg  # noqa: E402
+
 W, H = 1280, 720
-MONO = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
-SANS = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+MONO = ["/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", "C:/Windows/Fonts/consola.ttf",
+        "/System/Library/Fonts/Menlo.ttc"]
+SANS = ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "C:/Windows/Fonts/arialbd.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf"]
 
 
-def f(path, size):
-    return ImageFont.truetype(path, size) if os.path.exists(path) else ImageFont.load_default()
+def f(paths, size):
+    for path in paths:
+        if os.path.exists(path):
+            return ImageFont.truetype(path, size)
+    try:
+        return ImageFont.load_default(size)  # Pillow >= 10.1
+    except TypeError:
+        return ImageFont.load_default()
 
 
 def slide(title, sub):
@@ -44,6 +55,8 @@ def term(lines):
 
 
 def main():
+    if not all(ensure_ffmpeg()):
+        sys.exit("ffmpeg manquant : python scripts/setup.py")
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "v2s_test")
     out.mkdir(parents=True, exist_ok=True)
     fr = out / "_frames"
@@ -86,7 +99,7 @@ def main():
         lst.append(f"file '{p.resolve()}'\nduration {dur}")
         t += dur
     lst.append(f"file '{(fr / f'{len(seq) - 1:04d}.png').resolve()}'")
-    (out / "_list.txt").write_text("\n".join(lst) + "\n")
+    (out / "_list.txt").write_text("\n".join(lst) + "\n", encoding="utf-8")
     video = out / "tuto_venv.mp4"
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(out / "_list.txt"),
                     "-f", "lavfi", "-i", "anullsrc=r=16000:cl=mono", "-shortest",
@@ -106,7 +119,8 @@ def main():
     def ts(x):
         ms = int(round(x * 1000))
         return f"{ms // 3600000:02d}:{ms // 60000 % 60:02d}:{ms // 1000 % 60:02d},{ms % 1000:03d}"
-    (out / "tuto_venv.srt").write_text("\n".join(f"{i}\n{ts(a)} --> {ts(b)}\n{txt}\n" for i, (a, b, txt) in enumerate(srt, 1)))
+    (out / "tuto_venv.srt").write_text("\n".join(f"{i}\n{ts(a)} --> {ts(b)}\n{txt}\n" for i, (a, b, txt) in enumerate(srt, 1)),
+                                     encoding="utf-8")
     for p in fr.iterdir():
         p.unlink()
     fr.rmdir()

@@ -1,32 +1,17 @@
 #!/usr/bin/env bash
-# Installe video-to-skill comme skill Claude Code personnel (~/.claude/skills/video-to-skill)
-#   ./install.sh            → skill + dépendances Python (pillow, yt-dlp, faster-whisper)
-#   ./install.sh --minimal  → skill + pillow seulement (pas d'URL, pas de transcription)
-#   ./install.sh --project  → installe dans ./.claude/skills du projet courant
+# Installe video-to-skill (macOS / Linux / Git Bash). Tout le travail est fait par scripts/bootstrap.py :
+#   ./install.sh            → paquets, ffmpeg, runtime JS, Whisper small, autotest, skill ~/.claude/skills
+#   ./install.sh --minimal  → pillow + ffmpeg seulement (pas d'URL, pas de transcription)
+#   ./install.sh --project  → skill dans ./.claude/skills du projet courant
+#   ./install.sh --check    → diagnostic seul
+# Toutes les options : python3 scripts/bootstrap.py --help
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-DEST="$HOME/.claude/skills/video-to-skill"
-MINIMAL=0
-for a in "$@"; do
-  case "$a" in
-    --minimal) MINIMAL=1 ;;
-    --project) DEST="$PWD/.claude/skills/video-to-skill" ;;
-    *) echo "option inconnue : $a"; exit 1 ;;
-  esac
+PY=""
+for c in python3 python; do
+  if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>/dev/null; then
+    PY="$c"; break
+  fi
 done
-
-command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null || {
-  echo "⚠ ffmpeg manquant. Installe-le :"
-  echo "   macOS : brew install ffmpeg | Debian/Ubuntu : sudo apt install ffmpeg | Windows : winget install ffmpeg"
-}
-PY=$(command -v python3 || command -v python) || { echo "Python 3 requis"; exit 1; }
-
-PKGS="pillow"; [ "$MINIMAL" = 1 ] || PKGS="pillow yt-dlp faster-whisper"
-echo "→ pip install $PKGS"
-"$PY" -m pip install --user -q $PKGS 2>/dev/null || "$PY" -m pip install --user -q --break-system-packages $PKGS
-
-mkdir -p "$DEST"
-cp -R "$HERE/SKILL.md" "$HERE/scripts" "$HERE/references" "$DEST/"
-chmod +x "$DEST/scripts/"*.py
-echo "✔ Installé dans $DEST"
-echo "  Dans Claude Code : /video-to-skill <URL ou fichier vidéo>"
+[ -n "$PY" ] || { echo "Python 3.9+ requis (python3 introuvable)"; exit 1; }
+exec "$PY" "$HERE/scripts/bootstrap.py" "$@"

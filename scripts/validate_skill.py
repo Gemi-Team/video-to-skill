@@ -2,7 +2,7 @@
 """
 validate_skill.py — lint a generated skill folder before installing it.
 
-  python3 validate_skill.py path/to/skill-dir
+  python validate_skill.py path/to/skill-dir
 
 Errors (exit 1): missing/invalid frontmatter, bad name, description too long, secrets,
 broken relative links. Warnings: no timestamp citations, video narration left in,
@@ -11,6 +11,9 @@ body too long, unverified steps not flagged.
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _common import utf8_console  # noqa: E402
 
 SECRET_PATTERNS = [
     (r"sk-[A-Za-z0-9_-]{20,}", "clé API style OpenAI/Anthropic"),
@@ -40,6 +43,7 @@ def parse_frontmatter(text):
 
 
 def main():
+    utf8_console()
     if len(sys.argv) != 2:
         sys.exit(__doc__)
     root = Path(sys.argv[1])
@@ -48,7 +52,7 @@ def main():
     errors, warns = [], []
     if not skill.exists():
         sys.exit(f"ERREUR: {skill} introuvable")
-    text = skill.read_text()
+    text = skill.read_text(encoding="utf-8")
     fm, body = parse_frontmatter(text)
 
     if fm is None:
@@ -74,7 +78,7 @@ def main():
 
     files = [skill] + [p for p in root.rglob("*") if p.is_file() and p != skill and p.suffix in (".md", ".txt", ".py", ".sh", ".json", ".yaml", ".yml")]
     for f in files:
-        t = f.read_text(errors="ignore")
+        t = f.read_text(encoding="utf-8", errors="ignore")
         for pat, label in SECRET_PATTERNS:
             for m in re.finditer(pat, t):
                 frag = m.group(0)

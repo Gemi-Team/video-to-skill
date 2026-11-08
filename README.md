@@ -29,11 +29,14 @@ Envoie une vidéo à Claude → il la **regarde** (narration + images à l'écra
 
 ## Installation
 
-**Claude Code (recommandé — tout fonctionne, y compris YouTube et la transcription) :**
+**Le plus simple : demande à ton agent IA.** Ouvre le repo dans Claude Code (ou Cursor, Codex…) et dis : *« installe ce repo »*. Il lit [`AGENTS.md`](AGENTS.md) → [`LLM_SETUP.md`](LLM_SETUP.md) et s'occupe de tout, Whisper compris.
+
+**À la main — une commande, Windows / macOS / Linux, sans droits admin :**
 ```bash
-git clone <ce repo> && cd video-to-skill && ./install.sh
+python scripts/bootstrap.py          # Windows : py -3 scripts/bootstrap.py   (ou .\install.ps1)
+./install.sh                         # macOS / Linux / Git Bash (même chose)
 ```
-Prérequis : `ffmpeg`, Python 3.9+. `install.sh` installe `pillow`, `yt-dlp`, `faster-whisper`.
+`bootstrap.py` installe et **vérifie** : `pillow`, `yt-dlp` (+ résolveur JS YouTube, `curl_cffi`), `faster-whisper` + modèle Whisper `small` pré-téléchargé (GPU si dispo, sinon CPU), `ffmpeg` (winget / brew, ou binaires portables via pip), un runtime JS (deno/node), puis copie le skill dans `~/.claude/skills/video-to-skill` et lance un autotest. `--check` = diagnostic seul, `--json` = rapport pour un LLM, `--help` pour le reste.
 
 **claude.ai / app Claude :** enregistre le skill depuis la carte proposée dans la conversation (seul `SKILL.md` est enregistré ; le skill bascule alors sur son « mode de secours » en commandes ffmpeg intégrées) ou envoie le zip du repo. Dans l'espace de travail cloud, YouTube et le téléchargement des modèles Whisper peuvent être bloqués : **joins le fichier vidéo** (et son .srt si tu l'as).
 
@@ -45,22 +48,37 @@ Prérequis : `ffmpeg`, Python 3.9+. `install.sh` installe `pillow`, `yt-dlp`, `f
 Transforme cette vidéo en skill, surtout la partie 12:00–25:00
 ```
 
-Scripts seuls :
+Télécharger depuis YouTube (ou tout site supporté par yt-dlp) :
 ```bash
-python3 scripts/extract.py <url|fichier> --out v2s_work [--lang fr] [--subs sous-titres.srt] [--max-frames 90]
-python3 scripts/frame_at.py v2s_work 1:23 --crop 0,0.5,1,0.5      # zoom bas de l'écran
-python3 scripts/frame_at.py v2s_work --window 1:20 1:30 --step 1  # 1 image/s
-python3 scripts/validate_skill.py chemin/vers/skill/
+python scripts/download.py "https://www.youtube.com/watch?v=…"           # vidéo ≤720p + sous-titres + chapitres
+python scripts/download.py URL1 URL2 --out downloads --lang fr
+python scripts/download.py --file urls.txt                               # une URL par ligne
+python scripts/download.py URL --playlist --max-videos 20                # playlist / chaîne
+python scripts/download.py URL --audio-only                              # audio seul
+python scripts/download.py URL --section 12:00-25:00                     # un passage
+python scripts/download.py URL --cookies-from-browser firefox            # âge / membres / « not a bot »
 ```
+Il installe yt-dlp si besoin, le met à jour et réessaie quand YouTube change, ne récupère que les sous-titres utiles (fr/en, pas les traductions auto qui déclenchent des 429), et imprime un JSON (`files`, `subtitles`, `chapters`, `error`, `hint`).
 
-Transcription, par ordre de préférence : sous-titres manuels → sous-titres auto YouTube → Whisper local (`--whisper-model small`, `medium` pour plus de précision) → aucune (images seules, signalé).
+Scripts du pipeline :
+```bash
+python scripts/extract.py <url|fichier> --out v2s_work [--lang fr] [--subs sous-titres.srt] [--max-frames 90]
+python scripts/extract.py <fichier> --out v2s_work --whisper --whisper-model medium   # ignorer les sous-titres
+python scripts/frame_at.py v2s_work 1:23 --crop 0,0.5,1,0.5      # zoom bas de l'écran
+python scripts/frame_at.py v2s_work --window 1:20 1:30 --step 1  # 1 image/s
+python scripts/validate_skill.py chemin/vers/skill/
+```
+(`python3` sur macOS/Linux ; sous Windows `py -3` ou `python`.)
+
+Transcription, par ordre de préférence : sous-titres manuels → sous-titres auto YouTube → Whisper local (`--whisper-model small`, `medium` pour plus de précision ; GPU auto avec repli CPU) → aucune (images seules, signalé).
 
 ## Autotest
 
+`bootstrap.py` le lance tout seul. À la main :
 ```bash
-python3 tests/make_test_video.py /tmp/v2s_test        # fausse vidéo tuto terminal (50 s) + .srt piégé
-python3 scripts/extract.py /tmp/v2s_test/tuto_venv.mp4 --out /tmp/v2s_work
-python3 scripts/validate_skill.py examples/python-venv-requests
+python tests/make_test_video.py v2s_test        # fausse vidéo tuto terminal (50 s) + .srt piégé
+python scripts/extract.py v2s_test/tuto_venv.mp4 --out v2s_work
+python scripts/validate_skill.py examples/python-venv-requests
 ```
 `examples/python-venv-requests/` est le skill que Claude a généré à partir de cette vidéo de test (6/6 étapes rejouées avec succès).
 
@@ -75,13 +93,18 @@ python3 scripts/validate_skill.py examples/python-venv-requests
 
 ```
 SKILL.md                  instructions que Claude suit
+LLM_SETUP.md              guide d'installation pour un agent IA (Whisper, ffmpeg, yt-dlp, dépannage)
+AGENTS.md, CLAUDE.md      pointeurs lus automatiquement par les agents IA
+scripts/bootstrap.py      installation + vérification de tout, multi-OS, rapport JSON
+scripts/download.py       téléchargement YouTube & co (vidéo, sous-titres, chapitres, playlists)
 scripts/extract.py        ingestion, transcription, états d'écran, planches, timeline
 scripts/frame_at.py       zoom temporel / recadrage
 scripts/validate_skill.py lint du skill généré (frontmatter, secrets, citations, liens)
+scripts/_common.py        recherche de ffmpeg / runtime JS, pip, console UTF-8
 references/skill-template.md  squelette + règles d'écriture du skill généré
 tests/make_test_video.py  vidéo de test
 examples/                 skill généré par le test
-install.sh
+install.sh, install.ps1   raccourcis vers bootstrap.py
 ```
 
 Licence MIT.

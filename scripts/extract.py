@@ -11,14 +11,16 @@ extract.py — turn a video (URL or local file) into material Claude can "watch"
     sheets/sheet_01.jpg    contact sheets (3x3 grids, timestamp on each tile)
 
 Usage:
-  python3 extract.py <url-or-file> [--out work] [--lang fr] [--interval 15]
-                     [--max-frames 90] [--whisper-model small]
-                     [--no-transcribe] [--subs path.srt]
+  python extract.py <url-or-file> [--out work] [--lang fr] [--interval 15]
+                    [--max-frames 90] [--whisper-model small] [--whisper-device auto]
+                    [--no-transcribe] [--subs path.srt] [--cookies-from-browser firefox]
 
 Only hard dependency: ffmpeg/ffprobe + Pillow.
-Optional: yt-dlp (URLs, subtitles), faster-whisper (transcription).
+Optional: yt-dlp (URLs, subtitles — see download.py), faster-whisper (transcription).
+Missing something? python scripts/setup.py
 """
 import argparse
+import glob
 import json
 import math
 import os
@@ -28,10 +30,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _common import ensure_ffmpeg, fmt_ts, utf8_console  # noqa: E402
+
 try:
     from PIL import Image, ImageDraw, ImageFont, ImageChops
 except ImportError:
-    sys.exit("Pillow manquant : pip install pillow")
+    sys.exit("Pillow manquant : python scripts/setup.py  (ou pip install pillow)")
 
 WARNINGS = []
 
@@ -52,74 +57,78 @@ def run(cmd, check=True, capture=True):
     return r
 
 
-def fmt_ts(sec):
-    sec = max(0, sec)
-    h, rem = divmod(int(sec), 3600)
-    m, s = divmod(rem, 60)
-    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-
-
 # ---------------------------------------------------------------- ingest
+VIDEO_EXT = (".mp4", ".mkv", ".webm", ".mov", ".m4v", ".avi")
+
+
 def is_url(s):
     return re.match(r"^https?://", s) is not None
 
 
-def ingest(source, out: Path, lang):
+def read_info_json(path: Path, info):
+    try:
+        d = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return
+    info.update(title=d.get("title") or info.get("title"), description=(d.get("description") or "")[:3000],
+                chapters=[{"start": c["start_time"], "title": c["title"]} for c in (d.get("chapters") or [])],
+                uploader=d.get("uploader"), upload_date=d.get("upload_date"),
+                webpage_url=d.get("webpage_url"))
+
+
+def pick_subs(cands, lang):
+    """Preferred language first, then the original-language track, then the rest."""
+    if not cands:
+        return None
+    def score(p):
+        n = Path(p).name.lower()
+        code = Path(n).suffixes[-2][1:] if len(Path(n).suffixes) >= 2 else ""
+        # langue voulue > piste d'origine (xx-orig) > code simple « fr » > traduction « fr-de »
+        return (0 if lang and f".{lang}" in n else 1, 0 if "orig" in code else 1, "-" in code, n)
+    return Path(sorted(cands, key=score)[0])
+
+
+def ingest(source, out: Path, lang, cookies_browser=None):
     info = {"source": source, "title": None, "chapters": [], "description": None}
-    subs_file = None
     if is_url(source):
-        if not shutil.which("yt-dlp"):
-            sys.exit("yt-dlp manquant : pip install yt-dlp  (ou fournis un fichier vidéo local)")
-        langs = f"{lang}.*,{lang},en.*,en" if lang else "fr.*,fr,en.*,en"
+        from download import download_one
+        for old in out.glob("video.*"):  # pas de mélange avec un ancien téléchargement
+            old.unlink()
         log("téléchargement (≤720p) + sous-titres…")
-        r = run([
-            "yt-dlp", "-f", "bv*[height<=720]+ba/b[height<=720]/b",
-            "--merge-output-format", "mp4",
-            "--write-info-json", "--write-subs", "--write-auto-subs",
-            "--sub-langs", langs, "--sub-format", "vtt/srt/best",
-            "--no-playlist", "-o", str(out / "video.%(ext)s"), source,
-        ], check=False)
-        if r.returncode != 0 and not list(out.glob("video.*")):
-            msg = r.stderr.strip().splitlines()[-1] if r.stderr.strip() else "erreur inconnue"
-            sys.exit(f"Échec du téléchargement : {msg}\n"
-                     "→ Si le réseau bloque YouTube, télécharge la vidéo et donne le fichier local.")
-        vids = [p for p in out.glob("video.*") if p.suffix in (".mp4", ".mkv", ".webm", ".mov")]
+        r = download_one(source, out, "video.%(ext)s", lang=lang, max_height=720,
+                         cookies_browser=cookies_browser, progress=False)
+        if not r["ok"]:
+            last = ((r["error"] or "erreur inconnue").strip().splitlines() or ["erreur inconnue"])[-1]
+            sys.exit(f"Échec du téléchargement : {last}\n"
+                     f"→ {r['hint']}\n"
+                     "→ Sinon : télécharge la vidéo à la main et donne le fichier local.")
+        vids = [Path(f) for f in r["files"] if Path(f).suffix.lower() in VIDEO_EXT]
         if not vids:
             sys.exit("Aucune vidéo téléchargée.")
         video = vids[0]
-        ij = out / "video.info.json"
-        if ij.exists():
-            d = json.loads(ij.read_text())
-            info.update(title=d.get("title"), description=(d.get("description") or "")[:3000],
-                        chapters=[{"start": c["start_time"], "title": c["title"]}
-                                  for c in (d.get("chapters") or [])],
-                        uploader=d.get("uploader"), upload_date=d.get("upload_date"),
-                        webpage_url=d.get("webpage_url"))
-        # prefer manual subs over auto, preferred lang first
-        cands = sorted(out.glob("video*.vtt")) + sorted(out.glob("video*.srt"))
-        if cands:
-            def score(p):
-                n = p.name
-                return (0 if lang and f".{lang}" in n else 1, 1 if "orig" in n else 0, n)
-            subs_file = sorted(cands, key=score)[0]
-    else:
-        src = Path(source).expanduser().resolve()
-        if not src.exists():
-            sys.exit(f"Fichier introuvable : {src}")
-        video = out / ("video" + src.suffix.lower())
+        if r["info_json"]:
+            read_info_json(Path(r["info_json"]), info)
+        return video, info, pick_subs(r["subtitles"], lang)
+
+    src = Path(source).expanduser().resolve()
+    if not src.exists():
+        sys.exit(f"Fichier introuvable : {src}")
+    video = out / ("video" + src.suffix.lower())
+    if video.resolve() != src:
         if video.exists() or video.is_symlink():
             video.unlink()
         try:
             video.symlink_to(src)
-        except OSError:
+        except OSError:  # Windows sans droits de lien symbolique
             shutil.copy2(src, video)
-        info["title"] = src.stem
-        for ext in (".srt", ".vtt", f".{lang}.srt", f".{lang}.vtt", ".fr.srt", ".en.srt"):
-            side = src.with_name(src.stem + ext)
-            if side.exists():
-                subs_file = side
-                break
-    return video, info, subs_file
+    info["title"] = src.stem
+    # fichiers voisins : « nom.srt », « nom.fr.vtt »… et « nom.info.json » (produits par download.py)
+    stem = glob.escape(str(src.with_suffix("")))
+    cands = [p for ext in ("srt", "vtt") for p in glob.glob(f"{stem}.{ext}") + glob.glob(f"{stem}.*.{ext}")]
+    ij = src.with_suffix(".info.json")
+    if ij.exists():
+        read_info_json(ij, info)
+    return video, info, pick_subs(cands, lang)
 
 
 def probe(video):
@@ -150,7 +159,7 @@ def _ts(s):
 
 def parse_subs(path: Path):
     """Parse SRT/VTT, strip tags, collapse YouTube's rolling auto-caption duplicates."""
-    text = path.read_text(errors="ignore").replace("\r", "")
+    text = path.read_text(encoding="utf-8", errors="ignore").replace("\r", "")
     segs = []
     for block in re.split(r"\n\s*\n", text):
         lines = [l for l in block.strip().split("\n") if l.strip()]
@@ -191,23 +200,30 @@ def parse_subs(path: Path):
     return out
 
 
-def whisper_transcribe(video, out: Path, model_name, lang):
+def whisper_transcribe(video, out: Path, model_name, lang, device="auto"):
     try:
         from faster_whisper import WhisperModel
     except ImportError:
-        warn("faster-whisper non installé (pip install faster-whisper) : pas de transcription audio.")
+        warn("faster-whisper non installé (python scripts/setup.py) : pas de transcription audio.")
         return None
     wav = out / "audio.wav"
     run(["ffmpeg", "-y", "-v", "error", "-i", str(video), "-ac", "1", "-ar", "16000", str(wav)])
+    # GPU d'abord si dispo ; si CUDA/cuDNN est mal installé ça casse souvent au 1er segment → repli CPU
+    devices = [device] if device == "cpu" else [device, "cpu"]
     try:
-        log(f"transcription whisper ({model_name})… (peut prendre un moment)")
-        model = WhisperModel(model_name, device="auto", compute_type="int8")
-        segments, meta = model.transcribe(str(wav), language=lang or None, vad_filter=True, beam_size=5)
-        segs = [{"start": s.start, "end": s.end, "text": s.text.strip()} for s in segments]
-        log(f"langue détectée : {meta.language} ({meta.language_probability:.2f})")
-        return segs
-    except Exception as e:  # model download blocked, etc.
-        warn(f"Whisper indisponible ({type(e).__name__}: {str(e)[:150]}). Pas de transcription audio.")
+        for dev in devices:
+            try:
+                log(f"transcription whisper ({model_name}, {dev})… (peut prendre un moment)")
+                model = WhisperModel(model_name, device=dev, compute_type="int8")
+                segments, meta = model.transcribe(str(wav), language=lang or None, vad_filter=True, beam_size=5)
+                segs = [{"start": s.start, "end": s.end, "text": s.text.strip()} for s in segments]
+                log(f"langue détectée : {meta.language} ({meta.language_probability:.2f})")
+                return segs
+            except Exception as e:  # model download blocked, CUDA libs missing, etc.
+                last = f"{type(e).__name__}: {str(e)[:200]}"
+                if dev != devices[-1]:
+                    log(f"échec sur {dev} ({last}) → nouvel essai sur CPU")
+        warn(f"Whisper indisponible ({last}). Pas de transcription audio. Diagnostic : python scripts/setup.py --check")
         return None
     finally:
         wav.unlink(missing_ok=True)
@@ -348,8 +364,8 @@ def write_transcript(out: Path, segs):
             if t0 is None:
                 t0 = s["end"]
         if buf:
-            lines.append(f"[{fmt_ts(t0 or segs[-1]['start'])}] {' '.join(buf)}")
-    (out / "transcript.md").write_text("\n\n".join(lines) + "\n")
+            lines.append(f"[{fmt_ts(t0 if t0 is not None else segs[-1]['start'])}] {' '.join(buf)}")
+    (out / "transcript.md").write_text("\n\n".join(lines) + "\n", encoding="utf-8")
 
 
 def write_timeline(out: Path, frames, segs, chapters):
@@ -367,7 +383,8 @@ def write_timeline(out: Path, frames, segs, chapters):
         if pre:
             events.append((0, 0.5, f"> {pre}\n"))
     events.sort(key=lambda e: (e[0], e[1]))
-    (out / "timeline.md").write_text("# Timeline (images + narration)\n\n" + "\n".join(e[2] for e in events) + "\n")
+    (out / "timeline.md").write_text("# Timeline (images + narration)\n\n" + "\n".join(e[2] for e in events) + "\n",
+                                     encoding="utf-8")
 
 
 def main():
@@ -377,18 +394,22 @@ def main():
     ap.add_argument("--lang", default=None, help="langue attendue (fr, en…) ; auto si absent")
     ap.add_argument("--interval", type=float, default=None, help="1 image min. toutes les N s (auto)")
     ap.add_argument("--max-frames", type=int, default=90)
-    ap.add_argument("--whisper-model", default="small")
+    ap.add_argument("--whisper-model", default="small", help="tiny, base, small, medium, large-v3, turbo…")
+    ap.add_argument("--whisper-device", default="auto", choices=["auto", "cpu", "cuda"])
     ap.add_argument("--no-transcribe", action="store_true")
+    ap.add_argument("--whisper", action="store_true",
+                    help="ignorer les sous-titres et transcrire avec Whisper (sous-titres auto de mauvaise qualité)")
     ap.add_argument("--subs", default=None, help="fichier .srt/.vtt à utiliser")
+    ap.add_argument("--cookies-from-browser", default=None, metavar="NAVIGATEUR",
+                    help="pour les vidéos YouTube qui demandent une connexion (firefox, chrome, edge…)")
     a = ap.parse_args()
 
-    for tool in ("ffmpeg", "ffprobe"):
-        if not shutil.which(tool):
-            sys.exit(f"{tool} manquant : installe ffmpeg (brew/apt/winget install ffmpeg)")
+    if not all(ensure_ffmpeg()):
+        sys.exit("ffmpeg/ffprobe manquant : python scripts/setup.py  (ou winget/brew/apt install ffmpeg)")
 
     out = Path(a.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
-    video, info, subs = ingest(a.source, out, a.lang)
+    video, info, subs = ingest(a.source, out, a.lang, a.cookies_from_browser)
     meta = probe(video)
     if meta["duration"] <= 0:
         sys.exit("Durée illisible : fichier vidéo invalide ?")
@@ -398,10 +419,14 @@ def main():
     segs, tsrc = None, None
     if a.subs:
         subs = Path(a.subs)
+        if not subs.exists():
+            sys.exit(f"Sous-titres introuvables : {subs}")
+    if a.whisper:
+        subs = None
     if subs and Path(subs).exists():
         segs, tsrc = parse_subs(Path(subs)), f"sous-titres ({Path(subs).name})"
     elif not a.no_transcribe and meta["has_audio"]:
-        segs = whisper_transcribe(video, out, a.whisper_model, a.lang)
+        segs = whisper_transcribe(video, out, a.whisper_model, a.lang, a.whisper_device)
         tsrc = f"whisper {a.whisper_model}" if segs else None
     if not segs:
         segs = []
@@ -417,11 +442,12 @@ def main():
     manifest = {**info, **meta, "duration_hms": fmt_ts(meta["duration"]), "video": video.name,
                 "transcript_source": tsrc, "transcript_segments": len(segs),
                 "frame_interval_s": interval, "frames": frames, "sheets": sheets, "warnings": WARNINGS}
-    (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
+    (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({"out": str(out), "title": info["title"], "duration": fmt_ts(meta["duration"]),
                       "transcript": tsrc, "frames": len(frames), "sheets": len(sheets),
                       "warnings": WARNINGS}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
+    utf8_console()
     main()

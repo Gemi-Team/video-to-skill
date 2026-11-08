@@ -15,19 +15,27 @@ L'écran prime sur la narration : une commande se recopie depuis l'image, jamais
 `SKILL_DIR` = le dossier qui contient ce fichier (ex. `~/.claude/skills/video-to-skill`).
 Si `SKILL_DIR/scripts/extract.py` n'existe pas (skill installé sans ses fichiers), utilise le **mode de secours** en bas de page.
 
-Dépendances : `ffmpeg` + `ffprobe`, Python 3.9+ avec `pillow`. Optionnel : `yt-dlp` (URL + sous-titres), `faster-whisper` (transcription audio).
-Si quelque chose manque : `pip install pillow yt-dlp faster-whisper` (ajouter `--break-system-packages` si pip refuse), ffmpeg via le gestionnaire de paquets. Annonce ce que tu installes avant de le faire.
+`PY` = l'interpréteur Python : `python3` (macOS/Linux) ; sous **Windows** `py -3` ou `python` (`python3` y est souvent un faux raccourci du Microsoft Store).
+
+Dépendances : `ffmpeg` + `ffprobe`, Python 3.9+ avec `pillow`. Pour les URL : `yt-dlp` ; pour la transcription : `faster-whisper`.
+**Si quelque chose manque, une seule commande installe et vérifie tout** (sans sudo, idempotent, 2–10 min) :
+```bash
+PY "$SKILL_DIR/scripts/bootstrap.py" --json        # --check pour un simple diagnostic
+```
+Annonce-le à l'utilisateur avant de le lancer. Détails et dépannage : `SKILL_DIR/LLM_SETUP.md`.
 
 ## 1. Extraire
 
 ```bash
-python3 "$SKILL_DIR/scripts/extract.py" "<URL ou chemin>" --out ./v2s_work [--lang fr]
+PY "$SKILL_DIR/scripts/extract.py" "<URL ou chemin>" --out ./v2s_work [--lang fr]
 ```
 
 Produit dans `v2s_work/` : `manifest.json`, `transcript.md`, `timeline.md`, `frames/`, `sheets/` (planches 3×3 annotées `#n  M:SS`).
+Pour une URL, `extract.py` télécharge lui-même la vidéo (≤ 720p) + sous-titres + chapitres via `scripts/download.py`, qui met yt-dlp à jour et réessaie tout seul si YouTube a changé.
 
-- **URL refusée / réseau bloqué** (fréquent dans un espace de travail cloud) : dis-le en une phrase et demande à l'utilisateur de joindre le fichier vidéo (ou de lancer le skill dans Claude Code sur sa machine). Ne contourne pas le blocage.
-- **Pas de transcription** (pas de sous-titres, Whisper indisponible) : continue avec les images seules et signale-le dans le skill (`transcript_source: aucune`). Si l'utilisateur a un .srt, `--subs fichier.srt`.
+- **Plusieurs vidéos / playlist / juste télécharger** : `PY "$SKILL_DIR/scripts/download.py" URL1 URL2 --out downloads` (ou `--playlist --max-videos 10`), puis `extract.py` sur chaque fichier : sous-titres et chapitres voisins sont repris automatiquement.
+- **Échec de téléchargement** : lis le `hint` affiché. « not a bot » / âge / membres → demande à l'utilisateur s'il accepte `--cookies-from-browser firefox` (lit les cookies de son navigateur). Réseau bloqué (fréquent dans un espace de travail cloud) : dis-le en une phrase et demande le fichier vidéo. Ne contourne pas le blocage.
+- **Pas de transcription** (pas de sous-titres, Whisper indisponible) : continue avec les images seules et signale-le dans le skill (`transcript_source: aucune`). Si l'utilisateur a un .srt, `--subs fichier.srt`. Sous-titres auto de mauvaise qualité → `--whisper` (ignore les sous-titres, transcrit en local ; `--whisper-model medium` pour plus de précision).
 - Vidéo > 45 min : propose de cibler une partie (chapitres dans `manifest.json`) ou augmente `--max-frames`.
 
 ## 2. Regarder (ne saute aucune étape)
@@ -37,8 +45,8 @@ Produit dans `v2s_work/` : `manifest.json`, `transcript.md`, `timeline.md`, `fra
 3. Pour chaque moment important (commande tapée, réglage, formule, schéma, résultat affiché), **ouvre l'image pleine résolution** `frames/f_XXXX_*.jpg` et lis le texte à l'écran mot pour mot.
 4. Si une action reste ambiguë entre deux images (texte coupé, clic rapide, valeur qui change), zoome :
    ```bash
-   python3 "$SKILL_DIR/scripts/frame_at.py" v2s_work --window 1:20 1:30 --step 1
-   python3 "$SKILL_DIR/scripts/frame_at.py" v2s_work 1:24 --crop 0,0.6,1,0.4   # bas de l'écran
+   PY "$SKILL_DIR/scripts/frame_at.py" v2s_work --window 1:20 1:30 --step 1
+   PY "$SKILL_DIR/scripts/frame_at.py" v2s_work 1:24 --crop 0,0.6,1,0.4   # bas de l'écran
    ```
 5. Prends des notes de travail (pas dans le skill) : `[t] ce qui est dit | ce qui est visible | ce que ça implique`. Note tout désaccord narration/écran — **l'écran gagne**, et c'est souvent là que se cachent les vraies valeurs (versions, options, noms exacts).
 
@@ -72,7 +80,7 @@ Règles :
 ## 5. Vérifier
 
 ```bash
-python3 "$SKILL_DIR/scripts/validate_skill.py" ./<name>/
+PY "$SKILL_DIR/scripts/validate_skill.py" ./<name>/
 ```
 Corrige toutes les erreurs ✗, traite les avertissements ⚠ pertinents.
 
@@ -94,9 +102,11 @@ Message final : nom du skill, type de vidéo, nb d'étapes, ce qui a été véri
 
 ```bash
 mkdir -p v2s_work/frames v2s_work/sheets && cd v2s_work
-# URL : vidéo + sous-titres
-yt-dlp -f "bv*[height<=720]+ba/b[height<=720]/b" --merge-output-format mp4 \
-  --write-subs --write-auto-subs --sub-langs "fr.*,en.*" --convert-subs srt -o "video.%(ext)s" "<URL>"
+# URL : vidéo + sous-titres (pas de « fr.* » : ça télécharge des dizaines de traductions auto → HTTP 429
+# et yt-dlp abandonne la vidéo). --js-runtimes node si deno absent ; --ignore-errors : un sous-titre raté ne bloque pas.
+python3 -m pip install -U "yt-dlp[default]"
+python3 -m yt_dlp -f "bv*[height<=720]+ba/b[height<=720]/b" --merge-output-format mp4 --ignore-errors --no-playlist \
+  --write-subs --write-auto-subs --sub-langs "fr,fr-orig,en,en-orig" --convert-subs srt -o "video.%(ext)s" "<URL>"
 # 1 image toutes les 10 s (adapter : 5 s pour un tuto rapide)
 ffmpeg -i video.mp4 -vf "fps=1/10,scale=1280:-2" -q:v 3 frames/f_%04d.jpg
 # planches 3x3 (image n ≈ (n-1)*10 s)

@@ -1,4 +1,6 @@
 v2s_work/
+downloads/
 __pycache__/
 *.pyc
 .DS_Store
+.venv/
