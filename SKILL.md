@@ -55,7 +55,7 @@ Ne fabrique jamais d'étapes pour remplir un skill.
 
 ## 4. Écrire le skill
 
-Langue : celle de la demande de l'utilisateur (sauf consigne contraire). Structure : voir `references/skill-template.md`.
+Langue : celle de la demande de l'utilisateur (sauf consigne contraire). Structure détaillée : `references/skill-template.md`. Si ce fichier est absent, utilise dans l'ordre : frontmatter → titre → bloc « Vérification » → Prérequis → Étapes (ou Méthode) avec commande exacte, `✔ Réussite :` et `[t=MM:SS]` → Exemple travaillé → Variantes → Dépannage → Source.
 
 Règles :
 - **Frontmatter** : `name` kebab-case (≤ 64 car., sans « claude »/« anthropic »), `description` ≤ 1024 car. qui dit **quoi** et **quand l'utiliser** (phrases déclencheuses), sans `<` ni `>`.
