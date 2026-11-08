@@ -23,7 +23,7 @@ Envoie une vidéo à Claude → il la **regarde** (narration + images à l'écra
 
 1. Récupère le repo et ouvre Claude Code dedans :
    ```bash
-   git clone <url-du-repo> video-to-skill
+   git clone https://github.com/Gemi-Team/video-to-skill.git
    ```
    ```bash
    cd video-to-skill && claude
