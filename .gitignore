@@ -1,0 +1,4 @@
+v2s_work/
+__pycache__/
+*.pyc
+.DS_Store

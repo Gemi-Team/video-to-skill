@@ -1,0 +1,3 @@
+pillow>=10
+yt-dlp
+faster-whisper
