@@ -19,6 +19,41 @@ Envoie une vidéo à Claude → il la **regarde** (narration + images à l'écra
  ~/.claude/skills/<nom>/SKILL.md   (ou carte « enregistrer le skill » sur claude.ai)
 ```
 
+## Démarrage (associés) — 3 étapes, rien d'autre
+
+1. Récupère le repo et ouvre Claude Code dedans :
+   ```bash
+   git clone <url-du-repo> video-to-skill
+   ```
+   ```bash
+   cd video-to-skill && claude
+   ```
+   (ou ouvre le dossier dans l'app Claude, onglet Code)
+2. Demande, par exemple :
+   ```
+   /video-to-skill https://www.youtube.com/watch?v=…
+   ```
+   ou en clair : *« Lis le repo et transforme cette vidéo en skill : https://… »*
+3. Réponds aux éventuelles demandes d'autorisation (installation des dépendances la première fois) et, à la fin, dis si tu veux installer le skill.
+
+Claude lit [`CLAUDE.md`](CLAUDE.md) et fait tout le reste lui-même : installation (Python, ffmpeg, yt-dlp, Whisper), téléchargement, analyse image par image, découpage et sous-agents pour les vidéos longues, contrôle, assemblage, validation. Le skill généré est écrit dans `skills_out/<nom>/`.
+
+**Moins de demandes d'autorisation (optionnel)** : pour que Claude lance les scripts du tool sans te demander à chaque fois, crée `.claude/settings.local.json` (non versionné) avec :
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(python scripts/extract.py:*)", "Bash(python scripts/parts.py:*)",
+      "Bash(python scripts/frame_at.py:*)", "Bash(python scripts/assemble.py:*)",
+      "Bash(python scripts/validate_skill.py:*)", "Bash(python scripts/download.py:*)",
+      "Bash(python scripts/bootstrap.py --check:*)",
+      "Edit(v2s_work/**)", "Edit(skills_out/**)"
+    ]
+  }
+}
+```
+(Remplace `python` par `python3` sur macOS/Linux. L'installation complète des dépendances reste soumise à ton accord.)
+
 ## Ce qui le distingue d'un résumé de transcription
 
 - **L'écran prime sur l'audio.** Les commandes, formules, options sont recopiées depuis l'image. Dans le test fourni, la narration dit « request, version 2.32 », l'écran montre `requests==2.32.3` : le skill généré contient la bonne valeur.
@@ -29,7 +64,7 @@ Envoie une vidéo à Claude → il la **regarde** (narration + images à l'écra
 
 ## Installation
 
-**Le plus simple : demande à ton agent IA.** Ouvre le repo dans Claude Code (ou Cursor, Codex…) et dis : *« installe ce repo »*. Il lit [`AGENTS.md`](AGENTS.md) → [`LLM_SETUP.md`](LLM_SETUP.md) et s'occupe de tout, Whisper compris.
+**Le plus simple : rien à faire.** À la première vidéo demandée, Claude vérifie l'environnement et installe ce qui manque (voir « Démarrage » ci-dessus). Pour installer à l'avance, dis-lui *« installe ce repo »* : il suit [`LLM_SETUP.md`](LLM_SETUP.md), Whisper compris.
 
 **À la main — une commande, Windows / macOS / Linux, sans droits admin :**
 ```bash
@@ -70,6 +105,15 @@ python scripts/validate_skill.py chemin/vers/skill/
 ```
 (`python3` sur macOS/Linux ; sous Windows `py -3` ou `python`.)
 
+### Vidéos longues (2 h, 4 h…)
+
+Au-delà de 45 min, `extract.py` découpe la vidéo en parties (chapitres regroupés, ≤ 45 min chacune), chacune avec ses propres images (une à chaque changement d'écran, analysé à 2 images/s, et au moins une toutes les 10 s), planches, transcript et une consigne prête pour un sous-agent (`part_NN/AGENT_PROMPT.md`). Claude joue l'orchestrateur : il ajuste le découpage si besoin, lance **un sous-agent par partie** (contexte neuf à chaque fois), chacun regarde **toutes** les planches de sa partie et rend `notes/part_NN.md` avec un journal visuel (une ligne par planche). `assemble.py --check` refuse des notes incomplètes ; puis Claude assemble le tout en **un seul skill** dans `skills_out/<nom>/`.
+```bash
+python scripts/parts.py v2s_work --plan                        # voir le découpage
+python scripts/parts.py v2s_work --at 38:00,1:18:00,2:02:00    # imposer des bornes (rapide, pas de ré-analyse)
+```
+Règle d'apprentissage : **des méthodes, pas des informations**. On garde processus, frameworks, règles de décision, critères et erreurs à éviter ; on écarte anecdotes, chiffres isolés, autopromo et digressions. Sur YouTube, les passages balisés par **SponsorBlock** (sponsor, intro, autopromo…) sont sautés d'office.
+
 Transcription, par ordre de préférence : sous-titres manuels → sous-titres auto YouTube → Whisper local (`--whisper-model small`, `medium` pour plus de précision ; GPU auto avec repli CPU) → aucune (images seules, signalé).
 
 ## Autotest
@@ -87,17 +131,24 @@ python scripts/validate_skill.py examples/python-venv-requests
 - Claude voit des **images clés**, pas un flux continu : un geste rapide entre deux états stables peut échapper → `frame_at.py --window` pour densifier.
 - Les démonstrations physiques (cuisine, sport, bricolage) perdent du détail ; c'est fait pour les écrans, les slides et les tableaux.
 - Les étapes d'interface graphique ne sont pas rejouables automatiquement : elles sont marquées « non vérifiées ».
-- Vidéo longue (> 45 min) : cibler des chapitres, sinon le contexte de Claude sature.
+- Vidéo longue : découpée en parties traitées par des sous-agents (Claude Code). Sans sous-agents (claude.ai), les parties sont traitées l'une après l'autre, ce qui est moins fiable.
+- SponsorBlock ne couvre que les vidéos balisées par sa communauté ; le reste du tri est fait par Claude.
 
 ## Structure
 
 ```
 SKILL.md                  instructions que Claude suit
 LLM_SETUP.md              guide d'installation pour un agent IA (Whisper, ffmpeg, yt-dlp, dépannage)
-AGENTS.md, CLAUDE.md      pointeurs lus automatiquement par les agents IA
+CLAUDE.md                 point d'entrée lu automatiquement par Claude Code (tout le déroulé)
+AGENTS.md                 pointeur pour les autres agents IA
+.claude/commands/         commande /video-to-skill
+skills_out/               skills générés
 scripts/bootstrap.py      installation + vérification de tout, multi-OS, rapport JSON
 scripts/download.py       téléchargement YouTube & co (vidéo, sous-titres, chapitres, playlists)
-scripts/extract.py        ingestion, transcription, états d'écran, planches, timeline
+scripts/extract.py        ingestion, transcription, états d'écran, planches, timeline, SponsorBlock
+scripts/parts.py          découpage des vidéos longues en parties (une par sous-agent)
+scripts/assemble.py       contrôle des notes des sous-agents + assemblage en un skill
+references/part-agent-prompt.md, part-notes-template.md   consigne et format des notes des sous-agents
 scripts/frame_at.py       zoom temporel / recadrage
 scripts/validate_skill.py lint du skill généré (frontmatter, secrets, citations, liens)
 scripts/_common.py        recherche de ffmpeg / runtime JS, pip, console UTF-8

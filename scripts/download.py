@@ -179,7 +179,7 @@ def download_one(url, out_dir, template=DEFAULT_TEMPLATE, *, max_height=720, aud
         return res
     ff, _ = ensure_ffmpeg()
     if not ff:
-        log("⚠ ffmpeg introuvable : qualité limitée (pas de fusion audio+vidéo). Lance scripts/setup.py.")
+        log("⚠ ffmpeg introuvable : qualité limitée (pas de fusion audio+vidéo). Lance scripts/bootstrap.py.")
     updated = False
     for attempt in range(3):
         with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as tf:
@@ -224,6 +224,47 @@ def download_one(url, out_dir, template=DEFAULT_TEMPLATE, *, max_height=720, aud
     if subs and not res["subtitles"]:
         log("aucun sous-titre récupéré → extract.py utilisera Whisper")
     return res
+
+
+# ---------------------------------------------------------------- SponsorBlock
+# Base communautaire des passages « inutiles » des vidéos YouTube : https://sponsor.ajay.app
+SB_LABELS = {"sponsor": "sponsor", "selfpromo": "autopromo", "interaction": "rappel like/abonnement",
+             "intro": "intro / animation", "outro": "outro / générique", "preview": "aperçu / récap",
+             "filler": "digression", "music_offtopic": "musique hors sujet"}
+
+
+def fetch_sponsorblock(video_id, timeout=10):
+    """Passages à sauter [{start, end, category, label}] ; [] si aucun ; None si l'API est injoignable.
+    Requête anonyme : seul un préfixe de 4 caractères du hash de l'identifiant est envoyé."""
+    import hashlib
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+    prefix = hashlib.sha256(video_id.encode()).hexdigest()[:4]
+    q = urllib.parse.urlencode({"categories": json.dumps(list(SB_LABELS)), "actionTypes": json.dumps(["skip"])})
+    req = urllib.request.Request(f"https://sponsor.ajay.app/api/skipSegments/{prefix}?{q}",
+                                 headers={"User-Agent": "video-to-skill"})
+    data = None
+    for attempt in range(3):  # l'API a des ratés ponctuels
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                data = json.loads(r.read().decode("utf-8"))
+            break
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return []
+        except Exception:
+            pass
+        time.sleep(2 * (attempt + 1))
+    if data is None:
+        return None
+    for v in data:
+        if v.get("videoID") == video_id:
+            segs = [{"start": round(s["segment"][0], 2), "end": round(s["segment"][1], 2),
+                     "category": s["category"], "label": SB_LABELS.get(s["category"], s["category"])}
+                    for s in v.get("segments", []) if s["segment"][1] > s["segment"][0]]
+            return sorted(segs, key=lambda s: s["start"])
+    return []
 
 
 def main():

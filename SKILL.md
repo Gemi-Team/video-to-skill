@@ -10,6 +10,14 @@ Tu « regardes » une vidéo : tu lis la narration (sous-titres ou transcription
 Principe directeur : **tu n'écris pas une transcription, tu écris des instructions exécutables.**
 L'écran prime sur la narration : une commande se recopie depuis l'image, jamais depuis ce que dit l'audio.
 
+### Ce qu'on apprend : des méthodes, pas des informations
+
+Le skill doit contenir ce qu'un futur Claude pourra **appliquer, adapter ou dont il pourra s'inspirer** face à une situation nouvelle, pas ce que la vidéo raconte.
+- **Garder** : processus en étapes, frameworks, structures et modèles réutilisables, règles de décision (« si … alors … »), heuristiques, critères d'évaluation, erreurs à éviter avec leur raison, et le *pourquoi* d'une méthode quand il est donné.
+- **Écarter** : faits ou chiffres isolés, anecdotes, name-dropping, actualité, opinions sans méthode, autopromo, sponsors, digressions, répétitions.
+- Une anecdote qui cache une méthode → extrais le principe, garde l'anecdote en une phrase comme exemple. Un chiffre ne reste que s'il sert à décider (seuil, ordre de grandeur).
+- Procédure technique : la commande ou la valeur exacte vue à l'écran **est** la méthode → recopie-la.
+
 ## 0. Où sont les scripts
 
 `SKILL_DIR` = le dossier qui contient ce fichier (ex. `~/.claude/skills/video-to-skill`).
@@ -32,18 +40,23 @@ PY "$SKILL_DIR/scripts/extract.py" "<URL ou chemin>" --out ./v2s_work [--lang fr
 
 Produit dans `v2s_work/` : `manifest.json`, `transcript.md`, `timeline.md`, `frames/`, `sheets/` (planches 3×3 annotées `#n  M:SS`).
 Pour une URL, `extract.py` télécharge lui-même la vidéo (≤ 720p) + sous-titres + chapitres via `scripts/download.py`, qui met yt-dlp à jour et réessaie tout seul si YouTube a changé.
+Sur YouTube, les passages balisés par **SponsorBlock** (sponsor, intro, autopromo, digressions…) sont marqués `⏭` et ne reçoivent pas d'images : ne les regarde pas.
+
+**Vidéo de plus de 45 min** : `extract.py` la découpe aussi en parties `part_01/`, `part_02/`… (`manifest.json` → `parts` non vide). Dans ce cas, **passe à la section « Mode vidéo longue »** au lieu des sections 2 et 3.
 
 - **Plusieurs vidéos / playlist / juste télécharger** : `PY "$SKILL_DIR/scripts/download.py" URL1 URL2 --out downloads` (ou `--playlist --max-videos 10`), puis `extract.py` sur chaque fichier : sous-titres et chapitres voisins sont repris automatiquement.
 - **Échec de téléchargement** : lis le `hint` affiché. « not a bot » / âge / membres → demande à l'utilisateur s'il accepte `--cookies-from-browser firefox` (lit les cookies de son navigateur). Réseau bloqué (fréquent dans un espace de travail cloud) : dis-le en une phrase et demande le fichier vidéo. Ne contourne pas le blocage.
 - **Pas de transcription** (pas de sous-titres, Whisper indisponible) : continue avec les images seules et signale-le dans le skill (`transcript_source: aucune`). Si l'utilisateur a un .srt, `--subs fichier.srt`. Sous-titres auto de mauvaise qualité → `--whisper` (ignore les sous-titres, transcrit en local ; `--whisper-model medium` pour plus de précision).
-- Vidéo > 45 min : propose de cibler une partie (chapitres dans `manifest.json`) ou augmente `--max-frames`.
+- L'utilisateur ne veut qu'un passage d'une vidéo longue : génère le skill sur les parties concernées seulement (voir « Mode vidéo longue », étape 2).
 
 ## 2. Regarder (ne saute aucune étape)
 
+Les images ont été choisies pour que rien d'affiché ne t'échappe : une image à **chaque changement d'écran** (analyse à 2 images/s) et **au moins une toutes les 10 s** (`--every`). Regarde-les toutes.
+
 1. Lis `manifest.json` (titre, durée, chapitres, avertissements) puis `timeline.md` en entier.
-2. **Regarde toutes les planches `sheets/*.jpg` dans l'ordre** avec l'outil de lecture d'images. C'est ta vision d'ensemble.
-3. Pour chaque moment important (commande tapée, réglage, formule, schéma, résultat affiché), **ouvre l'image pleine résolution** `frames/f_XXXX_*.jpg` et lis le texte à l'écran mot pour mot.
-4. Si une action reste ambiguë entre deux images (texte coupé, clic rapide, valeur qui change), zoome :
+2. **Regarde toutes les planches `sheets/*.jpg` dans l'ordre, sans en sauter une**, avec l'outil de lecture d'images.
+3. Dès qu'une vignette montre autre chose qu'une personne qui parle (commande, réglage, formule, schéma, slide, résultat affiché), **ouvre l'image pleine résolution** `frames/f_XXXX_*.jpg` et lis le texte à l'écran mot pour mot.
+4. Passage où l'écran évolue vite (démo, slides qui défilent) ou action ambiguë entre deux images : densifie à 1 image/s et zoome :
    ```bash
    PY "$SKILL_DIR/scripts/frame_at.py" v2s_work --window 1:20 1:30 --step 1
    PY "$SKILL_DIR/scripts/frame_at.py" v2s_work 1:24 --crop 0,0.6,1,0.4   # bas de l'écran
@@ -60,6 +73,43 @@ Pour une URL, `extract.py` télécharge lui-même la vidéo (≤ 720p) + sous-ti
 | **Non instructif** | vlog, débat, pub, contenu sans méthode | **pas de skill** : rapport court expliquant pourquoi + ce qui serait récupérable |
 
 Ne fabrique jamais d'étapes pour remplir un skill.
+
+## Mode vidéo longue (> 45 min) — tu es l'orchestrateur
+
+Une seule passe sur 2 à 4 h de vidéo fait survoler. Tu découpes donc la vidéo, tu confies chaque partie à un **sous-agent qui démarre avec un contexte vide**, et tu assembles leurs notes en **un seul skill**.
+
+1. **Vue d'ensemble** : lis `manifest.json` (durée, chapitres, `skip_segments`, `parts`) et `parts.json`. Parcours rapidement les planches globales `sheets/` (pas les frames). Si la vidéo est non instructive (section 3), arrête-toi là et fais un rapport.
+2. **Décide du découpage.** Par défaut `extract.py` a regroupé les chapitres en parties de 45 min au plus ; chaque partie contient une image à chaque changement d'écran + au moins une toutes les 10 s (≈ 250 à 300 images, 30 planches). Ajuste si une frontière coupe une démonstration ou une idée, si une partie n'est que du bruit (pas de sous-agent pour elle, note pourquoi), ou si l'utilisateur ne veut qu'un passage :
+   ```bash
+   PY "$SKILL_DIR/scripts/parts.py" v2s_work --plan                         # voir le découpage
+   PY "$SKILL_DIR/scripts/parts.py" v2s_work --at 38:00,1:18:00,2:02:00     # bornes choisies par toi
+   PY "$SKILL_DIR/scripts/parts.py" v2s_work --max-minutes 30               # parties plus courtes
+   ```
+   C'est rapide : la vidéo n'est pas ré-analysée. Annonce le plan en une ligne par partie (plage, chapitres).
+3. **Lance un sous-agent par partie, tous en parallèle** (Claude Code : sous-agent `general-purpose`). Chaque partie contient sa consigne complète : `part_NN/AGENT_PROMPT.md` (méthodes à extraire, regarder **chaque planche**, densifier les démos, format des notes, journal visuel). Consigne à donner :
+   > Lis et exécute `<chemin absolu>/part_NN/AGENT_PROMPT.md`. N'écris que le fichier de notes indiqué. Réponds en 3 lignes.
+
+   Chaque sous-agent écrit `<work>/notes/part_NN.md`.
+   **Sans outil de sous-agent** (claude.ai) : traite les parties toi-même, l'une après l'autre, avec le même `AGENT_PROMPT.md`. Écris chaque fichier de notes avant de passer à la partie suivante et ne relis plus le matériau brut d'une partie terminée.
+4. **Contrôle automatique** :
+   ```bash
+   PY "$SKILL_DIR/scripts/assemble.py" v2s_work --check
+   ```
+   Il vérifie pour chaque partie : notes présentes, sections obligatoires, chaque méthode citée `[t=…]`, citations dans la plage de la partie, et **journal visuel complet** (une ligne par planche : la preuve que toutes les images ont été regardées). Partie en échec → relance **son** sous-agent avec la raison affichée, puis recontrôle. N'assemble pas tant que ce n'est pas `OK`.
+5. **Plan d'assemblage** : lis les notes (pas le matériau brut), puis
+   ```bash
+   PY "$SKILL_DIR/scripts/assemble.py" v2s_work --list                 # toutes les méthodes : P2.M7 + titre
+   PY "$SKILL_DIR/scripts/assemble.py" v2s_work --plan-template        # brouillon de plan JSON
+   ```
+   Écris `v2s_work/plan.json` : des **fichiers par thème, dans l'ordre logique d'application** (pas l'ordre de la vidéo). Une méthode présente dans plusieurs parties → garde-en une, mets les autres dans `"drop"` avec la raison (« fusionné dans 04, 4.7 »).
+6. **Assemble** :
+   ```bash
+   PY "$SKILL_DIR/scripts/assemble.py" v2s_work --plan v2s_work/plan.json --out skills_out/<nom>
+   ```
+   Il écrit `references/NN-<theme>.md` (méthodes renumérotées `N.k`, citations normalisées) et `references/99-incertitudes-et-ignore.md`. Ensuite, à la main :
+   - réalise les **fusions** annoncées dans `"drop"` (une méthode, toutes les citations) et corrige les renvois entre méthodes ;
+   - écris `SKILL.md` : quand l'utiliser, comment l'utiliser, **ordre d'attaque**, **carte des méthodes** (problème → méthode → lien), méthodes centrales condensées, principes transverses fusionnés, section **Source** (vidéo, parties, minutes utiles/ignorées, incertitudes) ; moins de 500 lignes.
+7. Puis sections **4** (règles d'écriture), **5** (vérifier) et **6** (livrer) comme pour une vidéo courte.
 
 ## 4. Écrire le skill
 
@@ -92,7 +142,7 @@ Relis enfin le skill comme un Claude qui n'a **pas** vu la vidéo : pourrait-il 
 
 ## 6. Livrer
 
-- **Claude Code / machine locale** : montre le plan (nom, emplacement, fichiers) puis, après accord, installe dans `~/.claude/skills/<name>/` (personnel) ou `.claude/skills/<name>/` (projet).
+- **Claude Code / machine locale** : écris toujours le skill d'abord dans `skills_out/<name>/` (dans le repo video-to-skill ; sinon dans le dossier courant). Puis demande s'il faut l'installer dans `~/.claude/skills/<name>/` (personnel) ou `.claude/skills/<name>/` (projet), et copie-le seulement après accord.
 - **claude.ai / Claude app** : si l'outil `propose_skills` est disponible, propose le skill avec (l'utilisateur l'enregistre depuis la carte) ; sinon envoie le dossier (zip) et explique où le placer. Note : une carte de skill n'enregistre que SKILL.md → si le skill a des `references/`, intègre l'essentiel dans SKILL.md ou livre aussi le zip.
 - **Skill du même nom déjà existant** : fusionne au lieu d'écraser — étapes confirmées par les deux vidéos = plus sûres ; divergences gardées comme variantes citées.
 

@@ -35,7 +35,7 @@ def main():
     a = ap.parse_args()
     utf8_console()
     if not all(ensure_ffmpeg()):
-        sys.exit("ffmpeg manquant : python scripts/setup.py")
+        sys.exit("ffmpeg manquant : python scripts/bootstrap.py")
 
     work = Path(a.work)
     vids = [p for p in work.glob("video.*") if p.suffix.lower() in (".mp4", ".mkv", ".webm", ".mov", ".m4v", ".avi")]

@@ -56,7 +56,7 @@ def term(lines):
 
 def main():
     if not all(ensure_ffmpeg()):
-        sys.exit("ffmpeg manquant : python scripts/setup.py")
+        sys.exit("ffmpeg manquant : python scripts/bootstrap.py")
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "v2s_test")
     out.mkdir(parents=True, exist_ok=True)
     fr = out / "_frames"

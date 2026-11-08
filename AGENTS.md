@@ -1,6 +1,6 @@
 # Instructions pour les agents IA
 
-- **Installer / faire marcher ce repo** (dépendances, ffmpeg, Whisper, yt-dlp) : suis [LLM_SETUP.md](LLM_SETUP.md). Une commande fait tout : `python scripts/bootstrap.py --json` (10 min de délai).
+- **Transformer une vidéo en skill** : suis [CLAUDE.md](CLAUDE.md) (déroulé complet : prérequis, extraction, sous-agents, assemblage, livraison dans `skills_out/`).
+- **Installer / réparer l'environnement** (Python, ffmpeg, yt-dlp, Whisper) : [LLM_SETUP.md](LLM_SETUP.md). Une commande fait tout : `python scripts/bootstrap.py --json` (10 min de délai).
 - **Télécharger une vidéo YouTube** : `python scripts/download.py <URL>` (JSON sur stdout, lis `hint` en cas d'échec).
-- **Transformer une vidéo en skill** : suis [SKILL.md](SKILL.md).
-- Sous Windows, `python3` peut être le faux raccourci du Microsoft Store : utilise `py -3` ou `python`.
+- Sous Windows, `python3` peut être le faux raccourci du Microsoft Store : utilise `python` ou `py -3`.

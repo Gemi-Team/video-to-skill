@@ -250,10 +250,19 @@ def step_selftest():
         m = json.loads(man.read_text(encoding="utf-8"))
         ok = len(m["frames"]) >= 5 and m["sheets"] and str(m["transcript_source"]).startswith("sous-titres")
         code2, out2 = sh([PY, str(HERE / "validate_skill.py"), str(ROOT / "examples" / "python-venv-requests")], 60)
+        # découpage « vidéo longue » simulé : parties de 20 s sur la vidéo de test
+        code3, out3 = sh([PY, str(HERE / "parts.py"), str(tmp / "work"), "--max-minutes", "0.34"], 300)
+        try:  # sh() renvoie stdout (le JSON) suivi de stderr (les logs)
+            nparts = len(json.JSONDecoder().raw_decode(out3.lstrip())[0]) if code3 == 0 else 0
+        except ValueError:
+            nparts = 0
+        prompt_ok = (tmp / "work" / "part_01" / "AGENT_PROMPT.md").exists()
         detail = (f"vidéo test → {len(m['frames'])} images, {len(m['sheets'])} planches, "
-                  f"transcription : {m['transcript_source']} ; validate_skill : {'OK' if code2 == 0 else 'ÉCHEC'}")
-        add("autotest", "ok" if ok and code2 == 0 else "fail", detail,
-            "" if ok else "sortie inattendue : ouvrir manifest.json de l'autotest")
+                  f"transcription : {m['transcript_source']} ; validate_skill : {'OK' if code2 == 0 else 'ÉCHEC'} ; "
+                  f"découpage : {nparts} parties{'' if prompt_ok else ' (AGENT_PROMPT.md manquant)'}")
+        ok = ok and code2 == 0 and nparts >= 2 and prompt_ok
+        add("autotest", "ok" if ok else "fail", detail,
+            "" if ok else "sortie inattendue : relancer l'étape en échec à la main et lire l'erreur")
         return ok
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

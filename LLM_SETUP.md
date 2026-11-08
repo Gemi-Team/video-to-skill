@@ -13,6 +13,8 @@ Ce que tu dois obtenir à la fin :
 
 **Tout ça se fait avec une seule commande : `scripts/bootstrap.py`.** Ton travail : choisir le bon Python, lancer la commande, lire le rapport, corriger les ✗, vérifier, rendre compte.
 
+> Si l'utilisateur a demandé de **transformer une vidéo en skill**, ce fichier n'est qu'un détour : suis [CLAUDE.md](CLAUDE.md), qui lance `bootstrap.py --check` puis l'installation si besoin, et reviens ici seulement en cas d'échec. Dans ce repo, utilise `--no-skill` : le repo lui-même sert de skill.
+
 ---
 
 ## Étape 0 — Trouver le bon interpréteur Python
