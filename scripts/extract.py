@@ -293,11 +293,15 @@ def select_frames(video, meta, out: Path, interval, threshold, max_frames, chapt
              "Utilise frame_at.py pour zoomer sur un passage.")
         first, last = kept[0], kept[-1]
         middle = kept[1:-1]
-        top = sorted(middle, key=lambda k: -k["change"])[: (max_frames - 2) // 2]
-        step = len(middle) / max(1, (max_frames - 2) - len(top))
-        spread = [middle[int(i * step)] for i in range(int(len(middle) / step))] if step else []
-        sel = {id(k): k for k in [first, last] + top + spread}
-        kept = sorted(sel.values(), key=lambda k: k["t"])[:max_frames]
+        budget = max_frames - 2
+        # moitié = plus gros changements ; autre moitié = répartie régulièrement parmi les images RESTANTES
+        # (avant, les deux listes se chevauchaient → doublons → ~76 images au lieu de 90)
+        top = sorted(middle, key=lambda k: -k["change"])[: budget // 2]
+        top_ids = {id(k) for k in top}
+        rest = [k for k in middle if id(k) not in top_ids]
+        need = budget - len(top)
+        spread = [rest[int(i * len(rest) / need)] for i in range(need)] if need > 0 and rest else []
+        kept = sorted([first, last] + top + spread, key=lambda k: k["t"])
 
     fdir = out / "frames"
     if fdir.exists():
