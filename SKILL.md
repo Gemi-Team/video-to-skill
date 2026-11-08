@@ -143,7 +143,11 @@ Finally, reread the skill as a Claude that has **not** seen the video: could it 
 
 ## 6. Deliver
 
-- **Claude Code / local machine**: always write the skill first to `skills_out/<name>/` (inside the video-to-skill repo; otherwise in the current folder). Then ask whether to install it in `~/.claude/skills/<name>/` (personal) or `.claude/skills/<name>/` (project), and copy it only after approval.
+- **Claude Code / local machine**: write the skill first to `skills_out/<name>/` (inside the video-to-skill repo; otherwise in the current folder), then install it **automatically, without asking**:
+  ```bash
+  PY "$SKILL_DIR/scripts/install_skill.py" skills_out/<name>             # → ~/.claude/skills/<name>/
+  ```
+  It refuses a skill that fails validation and backs up any previous version to `~/.claude/skills-backup/`. Use `--project` (→ `.claude/skills/<name>/`) or skip installing only if the user asked for it. Tell the user where it is installed and that deleting that folder removes it.
 - **claude.ai / Claude app**: if the `propose_skills` tool is available, offer the skill with it (the user saves it from the card); otherwise send the folder (zip) and explain where to put it. Note: a skill card only saves SKILL.md → if the skill has `references/`, fold the essentials into SKILL.md or also deliver the zip.
 - **A skill with the same name already exists**: merge instead of overwriting — steps confirmed by both videos are more reliable; disagreements are kept as cited variants.
 

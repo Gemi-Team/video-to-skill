@@ -4,5 +4,5 @@ argument-hint: <video URL or path> [instructions, e.g. "only 12:00–25:00"]
 ---
 Video and instructions: $ARGUMENTS
 
-Follow the "When the user gives a video" section of CLAUDE.md end to end, without asking the user to run anything.
+Follow the "When the user gives a video" section of CLAUDE.md end to end, without asking the user to run anything, and install the finished skill automatically.
 If no video is given, only ask for the URL or the file path.

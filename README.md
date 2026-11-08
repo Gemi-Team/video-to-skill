@@ -16,7 +16,7 @@ Give Claude a video → it **watches** it (narration + what is on screen) → it
  validate_skill.py + replays the steps in a throwaway folder
         │
         ▼
- skills_out/<name>/SKILL.md  →  ~/.claude/skills/<name>/  (on request)
+ skills_out/<name>/SKILL.md  →  ~/.claude/skills/<name>/  (installed automatically)
 ```
 
 ## Quick start (for teammates) — 3 steps, nothing else
@@ -34,9 +34,9 @@ Give Claude a video → it **watches** it (narration + what is on screen) → it
    /video-to-skill https://www.youtube.com/watch?v=…
    ```
    or in plain words: *"Read the repo and turn this video into a skill: https://…"*
-3. Approve the permission prompts (dependency install the first time) and, at the end, say whether you want the skill installed.
+3. Approve the permission prompts (dependency install the first time). That's it: at the end, the skill is installed automatically in `~/.claude/skills/<name>/` and Claude uses it in your next sessions.
 
-Claude reads [`CLAUDE.md`](CLAUDE.md) and does everything else itself: setup (Python, ffmpeg, yt-dlp, Whisper), download, frame-by-frame analysis, splitting and sub-agents for long videos, checks, assembly, validation. The generated skill is written to `skills_out/<name>/`.
+Claude reads [`CLAUDE.md`](CLAUDE.md) and does everything else itself: setup (Python, ffmpeg, yt-dlp, Whisper), download, frame-by-frame analysis, splitting and sub-agents for long videos, checks, assembly, validation. The generated skill is written to `skills_out/<name>/` and installed in `~/.claude/skills/<name>/` (delete that folder to remove it).
 
 **Fewer permission prompts (optional):** to let Claude run the tool's scripts without asking each time, create `.claude/settings.local.json` (not versioned) with:
 ```json
@@ -46,7 +46,7 @@ Claude reads [`CLAUDE.md`](CLAUDE.md) and does everything else itself: setup (Py
       "Bash(python scripts/extract.py:*)", "Bash(python scripts/parts.py:*)",
       "Bash(python scripts/frame_at.py:*)", "Bash(python scripts/assemble.py:*)",
       "Bash(python scripts/validate_skill.py:*)", "Bash(python scripts/download.py:*)",
-      "Bash(python scripts/bootstrap.py --check:*)",
+      "Bash(python scripts/bootstrap.py --check:*)", "Bash(python scripts/install_skill.py:*)",
       "Edit(v2s_work/**)", "Edit(skills_out/**)"
     ]
   }
@@ -157,6 +157,7 @@ scripts/parts.py          long-video split into parts (one per sub-agent)
 scripts/assemble.py       sub-agent notes check + assembly into one skill
 scripts/frame_at.py       time zoom / crop
 scripts/validate_skill.py lint for the generated skill (frontmatter, secrets, citations, links)
+scripts/install_skill.py  validate + install the generated skill in ~/.claude/skills (backs up any previous version)
 scripts/_common.py        ffmpeg / JS runtime lookup, pip, UTF-8 console
 references/skill-template.md  skeleton + writing rules for the generated skill
 references/part-agent-prompt.md, part-notes-template.md   sub-agent prompt and notes format

@@ -17,8 +17,8 @@ Triggers: a video URL or file, "turn this video into a skill", "learn from this 
    - one `general-purpose` sub-agent **per part, all launched in parallel**, with the instruction: "Read and carry out `<absolute path>/part_NN/AGENT_PROMPT.md`. Write the notes in <the user's language>. Only write the notes file it names. Reply in 3 lines.";
    - then `PY scripts/assemble.py v2s_work/<id> --check`: a failing part (incomplete visual log, missing notes) → relaunch **its** sub-agent with the reason;
    - then plan → `assemble.py --plan … --out skills_out/<name>` → merges → the skill's `SKILL.md`.
-5. **Delivery** — the final skill goes to `skills_out/<name>/` and must pass `PY scripts/validate_skill.py skills_out/<name>`. Only then ask whether the user wants it installed in `~/.claude/skills/<name>/`. That is the only question to ask, plus cookies if YouTube requires them.
-6. **Final message**, short: skill name and location, number of methods, coverage (parts, contact sheets reviewed, densified passages), main uncertainties.
+5. **Delivery — automatic, no question** — the final skill goes to `skills_out/<name>/`, then install it with `PY scripts/install_skill.py skills_out/<name>`: it validates the skill, installs it in `~/.claude/skills/<name>/` and backs up any previous version. Don't ask for confirmation (the user chose automatic install). If validation fails, fix the skill and run it again. Only install elsewhere (`--project`) or skip installing if the user asked for it. The only question you may ask during the whole run is about cookies, if YouTube requires them.
+6. **Final message**, short: skill name, where it is installed (and that deleting that folder removes it), number of methods, coverage (parts, contact sheets reviewed, densified passages), main uncertainties.
 
 ## Other requests
 
