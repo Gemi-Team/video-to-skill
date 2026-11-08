@@ -1,4 +1,4 @@
-# Skills générés
+# Generated skills
 
-Chaque sous-dossier est un skill produit par video-to-skill (SKILL.md + references/).
-Pour l'installer : copie le dossier dans ~/.claude/skills/ (ou demande-le à Claude).
+Each sub-folder is a skill produced by video-to-skill (`SKILL.md` + `references/`).
+To install one: copy the folder into `~/.claude/skills/` (or ask Claude to do it).

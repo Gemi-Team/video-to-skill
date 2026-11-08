@@ -1,68 +1,68 @@
 ---
 name: python-venv-requests
-description: Crée un environnement virtuel Python isolé pour un projet, y installe une version figée de requests et enregistre les dépendances dans requirements.txt. À utiliser quand l'utilisateur veut « créer un venv », « isoler les dépendances d'un projet Python », « installer requests proprement » ou « générer un requirements.txt ».
+description: Creates an isolated Python virtual environment for a project, installs a pinned version of requests in it and records the dependencies in requirements.txt. Use when the user wants to "create a venv", "isolate a Python project's dependencies", "install requests cleanly" or "generate a requirements.txt".
 ---
 
-# Environnement virtuel Python + requests figé
+# Python virtual environment + pinned requests
 
-> Vérification : 6/6 étapes exécutées avec succès le 2026-11-08 (Linux, Python 3.13) dans un dossier jetable.
-> Non vérifié : Windows (commande d'activation différente, voir Variantes).
+> Verification: 6/6 steps executed successfully on 2026-11-08 (Linux, Python 3.13) in a throwaway folder.
+> Not verified: Windows (different activation command, see Variants).
 
-À la fin : un dossier `.venv/` isolé, `requests` 2.32.3 installé dedans, et un `requirements.txt` qui permet de recréer l'environnement à l'identique.
+At the end: an isolated `.venv/` folder, `requests` 2.32.3 installed in it, and a `requirements.txt` that recreates the environment identically.
 
-## Prérequis
-- Python 3 accessible via `python3` [t=0:08]
-- Terminal ouvert à la racine du projet (`~/projet` dans la vidéo) [t=0:05]
+## Prerequisites
+- Python 3 available as `python3` [t=0:08]
+- Terminal open at the project root (`~/project` in the video) [t=0:05]
 
-## Étapes
+## Steps
 
-### 1. Créer l'environnement virtuel
+### 1. Create the virtual environment
 ```bash
 python3 -m venv .venv
 ```
-✔ Réussite : aucun message d'erreur, un dossier `.venv/` existe. [t=0:08]
+✔ Success: no error message, a `.venv/` folder exists. [t=0:08]
 
-### 2. L'activer
+### 2. Activate it
 ```bash
 source .venv/bin/activate
 ```
-✔ Réussite : le prompt commence par `(.venv)`. [t=0:19]
+✔ Success: the prompt starts with `(.venv)`. [t=0:19]
 
-### 3. Installer requests en version figée
+### 3. Install a pinned version of requests
 ```bash
 pip install requests==2.32.3
 ```
-La version exacte vient de l'écran : la narration dit « request, version 2.32 », l'écran montre `requests==2.32.3` [t=0:23].
-✔ Réussite : la dernière ligne contient `Successfully installed … requests-2.32.3`, avec les dépendances certifi, charset-normalizer, idna, urllib3. [t=0:23]
+The exact version comes from the screen: the narration says "request, version 2.32", the screen shows `requests==2.32.3` [t=0:23].
+✔ Success: the last line contains `Successfully installed … requests-2.32.3`, with the certifi, charset-normalizer, idna, urllib3 dependencies. [t=0:23]
 
-### 4. Vérifier l'installation
+### 4. Check the install
 ```bash
 python -c "import requests; print(requests.__version__)"
 ```
-✔ Réussite : affiche `2.32.3`. [t=0:31]
+✔ Success: prints `2.32.3`. [t=0:31]
 
-### 5. Figer les dépendances
+### 5. Freeze the dependencies
 ```bash
 pip freeze > requirements.txt
 ```
 [t=0:36]
 
-### 6. Contrôler le fichier
+### 6. Check the file
 ```bash
 grep requests requirements.txt
 ```
-✔ Réussite : affiche `requests==2.32.3`. [t=0:45]
+✔ Success: prints `requests==2.32.3`. [t=0:45]
 
-## Variantes
-- ➕ ajouté : sous Windows (PowerShell), l'activation est `.venv\Scripts\Activate.ps1` (source : https://docs.python.org/3/library/venv.html).
-- ➕ ajouté : recréer l'environnement ailleurs → `python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt` (même source).
-- Autre version de requests : remplacer `2.32.3` à l'étape 3 ; la vidéo ne traite que celle-ci.
+## Variants
+- ➕ added: on Windows (PowerShell), activation is `.venv\Scripts\Activate.ps1` (source: https://docs.python.org/3/library/venv.html).
+- ➕ added: recreate the environment elsewhere → `python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt` (same source).
+- Another requests version: replace `2.32.3` in step 3; the video only covers this one.
 
-## Dépannage
-- `(.venv)` n'apparaît pas → l'étape 2 a été lancée avec `sh` au lieu de `bash`/`zsh` : utiliser `. .venv/bin/activate`. (➕ ajouté, même source)
-- ➕ ajouté : ajouter `.venv/` au `.gitignore` pour ne pas versionner l'environnement.
+## Troubleshooting
+- `(.venv)` does not appear → step 2 was run with `sh` instead of `bash`/`zsh`: use `. .venv/bin/activate`. (➕ added, same source)
+- ➕ added: add `.venv/` to `.gitignore` so the environment is not versioned.
 
 ## Source
-- Vidéo : « Python : environnement virtuel » — vidéo de test générée par `tests/make_test_video.py`
-- Transcription : sous-titres fournis (.srt)
-- Extrait le 2026-11-08 avec video-to-skill
+- Video: "Python: virtual environment" — test video generated by `tests/make_test_video.py`
+- Transcript: provided subtitles (.srt)
+- Extracted on 2026-11-08 with video-to-skill

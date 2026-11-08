@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Installe video-to-skill (macOS / Linux / Git Bash). Tout le travail est fait par scripts/bootstrap.py :
-#   ./install.sh            → paquets, ffmpeg, runtime JS, Whisper small, autotest, skill ~/.claude/skills
-#   ./install.sh --minimal  → pillow + ffmpeg seulement (pas d'URL, pas de transcription)
-#   ./install.sh --project  → skill dans ./.claude/skills du projet courant
-#   ./install.sh --check    → diagnostic seul
-# Toutes les options : python3 scripts/bootstrap.py --help
+# Installs video-to-skill (macOS / Linux / Git Bash). All the work is done by scripts/bootstrap.py:
+#   ./install.sh            → packages, ffmpeg, JS runtime, Whisper small, self-test, skill ~/.claude/skills
+#   ./install.sh --minimal  → pillow + ffmpeg only (no URLs, no transcription)
+#   ./install.sh --project  → skill in ./.claude/skills of the current project
+#   ./install.sh --check    → diagnostics only
+# All options: python3 scripts/bootstrap.py --help
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PY=""
@@ -13,5 +13,5 @@ for c in python3 python; do
     PY="$c"; break
   fi
 done
-[ -n "$PY" ] || { echo "Python 3.9+ requis (python3 introuvable)"; exit 1; }
+[ -n "$PY" ] || { echo "Python 3.9+ required (python3 not found)"; exit 1; }
 exec "$PY" "$HERE/scripts/bootstrap.py" "$@"

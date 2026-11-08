@@ -31,26 +31,26 @@ def main():
     ap.add_argument("times", nargs="*")
     ap.add_argument("--window", nargs=2, metavar=("START", "END"))
     ap.add_argument("--step", type=float, default=1.0)
-    ap.add_argument("--crop", default=None, help="x,y,w,h en fractions de l'image")
+    ap.add_argument("--crop", default=None, help="x,y,w,h as fractions of the frame")
     a = ap.parse_args()
     utf8_console()
     if not all(ensure_ffmpeg()):
-        sys.exit("ffmpeg manquant : python scripts/bootstrap.py")
+        sys.exit("ffmpeg missing: python scripts/bootstrap.py")
 
     work = Path(a.work)
     vids = [p for p in work.glob("video.*") if p.suffix.lower() in (".mp4", ".mkv", ".webm", ".mov", ".m4v", ".avi")]
     if not vids:
-        sys.exit(f"pas de video.* dans {work} — lance d'abord extract.py")
+        sys.exit(f"no video.* in {work} — run extract.py first")
     video = vids[0]
     ts = [parse_t(t) for t in a.times]
     if a.window:
         s, e = parse_t(a.window[0]), parse_t(a.window[1])
         n = int((e - s) / a.step) + 1
         if n > 40:
-            sys.exit(f"{n} images demandées : réduis la fenêtre ou augmente --step (max 40)")
+            sys.exit(f"{n} frames requested: shorten the window or increase --step (max 40)")
         ts += [s + i * a.step for i in range(n)]
     if not ts:
-        sys.exit("donne au moins un instant ou --window")
+        sys.exit("give at least one timestamp or --window")
 
     vf = "scale='min(1920,iw)':-2"
     if a.crop:

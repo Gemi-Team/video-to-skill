@@ -1,44 +1,44 @@
 # video-to-skill
 
-Envoie une vidéo à Claude → il la **regarde** (narration + images à l'écran) → il en tire un **skill** (`SKILL.md`) qu'il pourra réutiliser ensuite.
+Give Claude a video → it **watches** it (narration + what is on screen) → it turns it into a reusable **skill** (`SKILL.md`).
 
 ```
-/video-to-skill https://youtube.com/watch?v=…        (ou un fichier .mp4 joint)
+/video-to-skill https://youtube.com/watch?v=…        (or an attached .mp4 file)
         │
         ▼
- extract.py ── télécharge, transcrit, détecte chaque « état d'écran » stable
-        │      → frames/  sheets/ (planches 3×3)  timeline.md  transcript.md
+ extract.py ── downloads, transcribes, detects every settled "screen state"
+        │      → frames/  sheets/ (3×3 contact sheets)  timeline.md  transcript.md
         ▼
- Claude regarde les planches, zoome sur les détails (frame_at.py),
- classe la vidéo (procédure / méthode / non instructive) et écrit le skill
+ Claude looks at every contact sheet, zooms into details (frame_at.py),
+ classifies the video (procedure / method / not instructional) and writes the skill
         │
         ▼
- validate_skill.py + rejoue les étapes dans un dossier jetable
+ validate_skill.py + replays the steps in a throwaway folder
         │
         ▼
- ~/.claude/skills/<nom>/SKILL.md   (ou carte « enregistrer le skill » sur claude.ai)
+ skills_out/<name>/SKILL.md  →  ~/.claude/skills/<name>/  (on request)
 ```
 
-## Démarrage (associés) — 3 étapes, rien d'autre
+## Quick start (for teammates) — 3 steps, nothing else
 
-1. Récupère le repo et ouvre Claude Code dedans :
+1. Get the repo and open Claude Code in it:
    ```bash
    git clone https://github.com/Gemi-Team/video-to-skill.git
    ```
    ```bash
    cd video-to-skill && claude
    ```
-   (ou ouvre le dossier dans l'app Claude, onglet Code)
-2. Demande, par exemple :
+   (or open the folder in the Claude desktop app, Code tab)
+2. Ask, for example:
    ```
    /video-to-skill https://www.youtube.com/watch?v=…
    ```
-   ou en clair : *« Lis le repo et transforme cette vidéo en skill : https://… »*
-3. Réponds aux éventuelles demandes d'autorisation (installation des dépendances la première fois) et, à la fin, dis si tu veux installer le skill.
+   or in plain words: *"Read the repo and turn this video into a skill: https://…"*
+3. Approve the permission prompts (dependency install the first time) and, at the end, say whether you want the skill installed.
 
-Claude lit [`CLAUDE.md`](CLAUDE.md) et fait tout le reste lui-même : installation (Python, ffmpeg, yt-dlp, Whisper), téléchargement, analyse image par image, découpage et sous-agents pour les vidéos longues, contrôle, assemblage, validation. Le skill généré est écrit dans `skills_out/<nom>/`.
+Claude reads [`CLAUDE.md`](CLAUDE.md) and does everything else itself: setup (Python, ffmpeg, yt-dlp, Whisper), download, frame-by-frame analysis, splitting and sub-agents for long videos, checks, assembly, validation. The generated skill is written to `skills_out/<name>/`.
 
-**Moins de demandes d'autorisation (optionnel)** : pour que Claude lance les scripts du tool sans te demander à chaque fois, crée `.claude/settings.local.json` (non versionné) avec :
+**Fewer permission prompts (optional):** to let Claude run the tool's scripts without asking each time, create `.claude/settings.local.json` (not versioned) with:
 ```json
 {
   "permissions": {
@@ -52,110 +52,117 @@ Claude lit [`CLAUDE.md`](CLAUDE.md) et fait tout le reste lui-même : installati
   }
 }
 ```
-(Remplace `python` par `python3` sur macOS/Linux. L'installation complète des dépendances reste soumise à ton accord.)
+(Use `python3` instead of `python` on macOS/Linux. The full dependency install still asks for your approval.)
 
-## Ce qui le distingue d'un résumé de transcription
+## What makes it different from a transcript summary
 
-- **L'écran prime sur l'audio.** Les commandes, formules, options sont recopiées depuis l'image. Dans le test fourni, la narration dit « request, version 2.32 », l'écran montre `requests==2.32.3` : le skill généré contient la bonne valeur.
-- **Détection des états d'écran stabilisés**, pas des « changements de scène » : sur un enregistrement d'écran, taper une commande ne déclenche presque aucun changement de scène (score ffmpeg ≈ 0,04). `extract.py` garde l'image quand l'écran a changé *puis s'est arrêté de bouger* → commande complète, menu ouvert, résultat affiché.
-- **Chaque étape est citée** `[t=MM:SS]`, l'incertain est marqué `⚠ incertain`, ce qui est ajouté hors vidéo est marqué `➕ ajouté` + source.
-- **Vérification honnête** : les étapes sûres sont rejouées dans un dossier jetable ; le skill dit ce qui a été vérifié et ce qui ne l'a pas été.
-- **Pas de skill bidon** : une vidéo sans méthode (vlog, débat) donne un rapport, pas des étapes inventées.
+- **The screen beats the audio.** Commands, formulas and options are copied from the image. In the bundled test, the narration says "request, version 2.32" while the screen shows `requests==2.32.3`: the generated skill has the right value.
+- **Settled screen states, not "scene changes":** in a screen recording, typing a command barely registers as a scene change (ffmpeg score ≈ 0.04). `extract.py` keeps a frame when the screen has changed *and then stopped moving* → full command, open menu, displayed result.
+- **Every step is cited** `[t=MM:SS]`; anything unclear is marked `⚠ uncertain`; anything added from outside the video is marked `➕ added` with its source.
+- **Honest verification:** safe steps are replayed in a throwaway folder; the skill says what was verified and what was not.
+- **No fake skills:** a video without a method (vlog, debate) produces a short report, not invented steps.
+- **Methods, not information:** the skill keeps what Claude can apply — processes, frameworks, decision rules, criteria, mistakes to avoid — and drops anecdotes, isolated figures, self-promotion and digressions.
 
 ## Installation
 
-**Le plus simple : rien à faire.** À la première vidéo demandée, Claude vérifie l'environnement et installe ce qui manque (voir « Démarrage » ci-dessus). Pour installer à l'avance, dis-lui *« installe ce repo »* : il suit [`LLM_SETUP.md`](LLM_SETUP.md), Whisper compris.
+**Easiest: nothing to do.** On the first video request, Claude checks the environment and installs what is missing (see "Quick start"). To install ahead of time, tell Claude *"install this repo"*: it follows [`LLM_SETUP.md`](LLM_SETUP.md), Whisper included.
 
-**À la main — une commande, Windows / macOS / Linux, sans droits admin :**
+**By hand — one command, Windows / macOS / Linux, no admin rights:**
 ```bash
-python scripts/bootstrap.py          # Windows : py -3 scripts/bootstrap.py   (ou .\install.ps1)
-./install.sh                         # macOS / Linux / Git Bash (même chose)
+python scripts/bootstrap.py          # Windows: py -3 scripts/bootstrap.py   (or .\install.ps1)
+./install.sh                         # macOS / Linux / Git Bash (same thing)
 ```
-`bootstrap.py` installe et **vérifie** : `pillow`, `yt-dlp` (+ résolveur JS YouTube, `curl_cffi`), `faster-whisper` + modèle Whisper `small` pré-téléchargé (GPU si dispo, sinon CPU), `ffmpeg` (winget / brew, ou binaires portables via pip), un runtime JS (deno/node), puis copie le skill dans `~/.claude/skills/video-to-skill` et lance un autotest. `--check` = diagnostic seul, `--json` = rapport pour un LLM, `--help` pour le reste.
+`bootstrap.py` installs and **verifies**: `pillow`, `yt-dlp` (+ YouTube JS challenge solver, `curl_cffi`), `faster-whisper` + the Whisper `small` model pre-downloaded (GPU if available, otherwise CPU), `ffmpeg` (winget / brew, or portable binaries via pip), a JS runtime (deno/node), then copies the skill to `~/.claude/skills/video-to-skill` and runs a self-test. `--check` = diagnostics only, `--json` = report for an LLM, `--help` for the rest.
 
-**claude.ai / app Claude :** enregistre le skill depuis la carte proposée dans la conversation (seul `SKILL.md` est enregistré ; le skill bascule alors sur son « mode de secours » en commandes ffmpeg intégrées) ou envoie le zip du repo. Dans l'espace de travail cloud, YouTube et le téléchargement des modèles Whisper peuvent être bloqués : **joins le fichier vidéo** (et son .srt si tu l'as).
+**claude.ai / Claude app:** save the skill from the card offered in the conversation (only `SKILL.md` is saved; the skill then falls back to its built-in ffmpeg commands) or upload the repo zip. In the cloud workspace, YouTube and Whisper model downloads may be blocked: **attach the video file** (and its .srt if you have one).
 
-## Utilisation
+## Usage
 
 ```
 /video-to-skill https://www.youtube.com/watch?v=…
-/video-to-skill ~/Downloads/tuto.mp4
-Transforme cette vidéo en skill, surtout la partie 12:00–25:00
+/video-to-skill ~/Downloads/tutorial.mp4
+Turn this video into a skill, mostly the 12:00–25:00 part
 ```
 
-Télécharger depuis YouTube (ou tout site supporté par yt-dlp) :
+Download from YouTube (or any site yt-dlp supports):
 ```bash
-python scripts/download.py "https://www.youtube.com/watch?v=…"           # vidéo ≤720p + sous-titres + chapitres
-python scripts/download.py URL1 URL2 --out downloads --lang fr
-python scripts/download.py --file urls.txt                               # une URL par ligne
-python scripts/download.py URL --playlist --max-videos 20                # playlist / chaîne
-python scripts/download.py URL --audio-only                              # audio seul
-python scripts/download.py URL --section 12:00-25:00                     # un passage
-python scripts/download.py URL --cookies-from-browser firefox            # âge / membres / « not a bot »
+python scripts/download.py "https://www.youtube.com/watch?v=…"           # video ≤720p + subtitles + chapters
+python scripts/download.py URL1 URL2 --out downloads --lang en
+python scripts/download.py --file urls.txt                               # one URL per line
+python scripts/download.py URL --playlist --max-videos 20                # playlist / channel
+python scripts/download.py URL --audio-only                              # audio only
+python scripts/download.py URL --section 12:00-25:00                     # one section
+python scripts/download.py URL --cookies-from-browser firefox            # age / members-only / "not a bot"
 ```
-Il installe yt-dlp si besoin, le met à jour et réessaie quand YouTube change, ne récupère que les sous-titres utiles (fr/en, pas les traductions auto qui déclenchent des 429), et imprime un JSON (`files`, `subtitles`, `chapters`, `error`, `hint`).
+It installs yt-dlp when needed, updates it and retries when YouTube changes, only fetches useful subtitles (your language + English, not the dozens of auto-translations that trigger HTTP 429), and prints JSON (`files`, `subtitles`, `chapters`, `error`, `hint`).
 
-Scripts du pipeline :
+Pipeline scripts:
 ```bash
-python scripts/extract.py <url|fichier> --out v2s_work [--lang fr] [--subs sous-titres.srt] [--max-frames 90]
-python scripts/extract.py <fichier> --out v2s_work --whisper --whisper-model medium   # ignorer les sous-titres
-python scripts/frame_at.py v2s_work 1:23 --crop 0,0.5,1,0.5      # zoom bas de l'écran
-python scripts/frame_at.py v2s_work --window 1:20 1:30 --step 1  # 1 image/s
-python scripts/validate_skill.py chemin/vers/skill/
+python scripts/extract.py <url|file> --out v2s_work [--lang en] [--subs subtitles.srt] [--every 10]
+python scripts/extract.py <file> --out v2s_work --whisper --whisper-model medium   # ignore subtitles
+python scripts/frame_at.py v2s_work 1:23 --crop 0,0.5,1,0.5      # zoom on the bottom half
+python scripts/frame_at.py v2s_work --window 1:20 1:30 --step 1  # 1 frame per second
+python scripts/validate_skill.py path/to/skill/
 ```
-(`python3` sur macOS/Linux ; sous Windows `py -3` ou `python`.)
+(`python3` on macOS/Linux; on Windows `py -3` or `python`.)
 
-### Vidéos longues (2 h, 4 h…)
+### Frame coverage
 
-Au-delà de 45 min, `extract.py` découpe la vidéo en parties (chapitres regroupés, ≤ 45 min chacune), chacune avec ses propres images (une à chaque changement d'écran, analysé à 2 images/s, et au moins une toutes les 10 s), planches, transcript et une consigne prête pour un sous-agent (`part_NN/AGENT_PROMPT.md`). Claude joue l'orchestrateur : il ajuste le découpage si besoin, lance **un sous-agent par partie** (contexte neuf à chaque fois), chacun regarde **toutes** les planches de sa partie et rend `notes/part_NN.md` avec un journal visuel (une ligne par planche). `assemble.py --check` refuse des notes incomplètes ; puis Claude assemble le tout en **un seul skill** dans `skills_out/<nom>/`.
+Frames are chosen so that nothing shown on screen is missed: the video is analysed at **2 frames per second**, a frame is kept at **every screen change**, plus **at least one every 10 seconds** (`--every`). Claude (or each sub-agent) must look at every contact sheet, open full-resolution frames whenever there is something to read, and densify fast demos to 1 frame/s.
+
+### Long videos (2 h, 4 h…)
+
+Beyond 45 min, `extract.py` splits the video into parts (chapters grouped, ≤ 45 min each), each with its own frames (~250–300), contact sheets, transcript and a ready-made prompt for a sub-agent (`part_NN/AGENT_PROMPT.md`). Claude acts as the orchestrator: it adjusts the split if needed, launches **one sub-agent per part** (fresh context each time, all in parallel); each one looks at **every** contact sheet of its part and returns `notes/part_NN.md` with a visual log (one line per sheet). `assemble.py --check` rejects incomplete notes; then Claude assembles everything into **a single skill** in `skills_out/<name>/`.
 ```bash
-python scripts/parts.py v2s_work --plan                        # voir le découpage
-python scripts/parts.py v2s_work --at 38:00,1:18:00,2:02:00    # imposer des bornes (rapide, pas de ré-analyse)
+python scripts/parts.py v2s_work --plan                        # show the split
+python scripts/parts.py v2s_work --at 38:00,1:18:00,2:02:00    # force boundaries (fast, no re-analysis)
+python scripts/assemble.py v2s_work --check                    # are the sub-agents' notes complete?
 ```
-Règle d'apprentissage : **des méthodes, pas des informations**. On garde processus, frameworks, règles de décision, critères et erreurs à éviter ; on écarte anecdotes, chiffres isolés, autopromo et digressions. Sur YouTube, les passages balisés par **SponsorBlock** (sponsor, intro, autopromo…) sont sautés d'office.
+On YouTube, segments tagged by **SponsorBlock** (sponsor, intro, self-promotion…) are skipped automatically.
 
-Transcription, par ordre de préférence : sous-titres manuels → sous-titres auto YouTube → Whisper local (`--whisper-model small`, `medium` pour plus de précision ; GPU auto avec repli CPU) → aucune (images seules, signalé).
+Transcript, in order of preference: manual subtitles → YouTube auto-captions → local Whisper (`--whisper-model small`, `medium` for more accuracy; GPU when available with CPU fallback) → none (frames only, flagged).
 
-## Autotest
+## Self-test
 
-`bootstrap.py` le lance tout seul. À la main :
+`bootstrap.py` runs it automatically. By hand:
 ```bash
-python tests/make_test_video.py v2s_test        # fausse vidéo tuto terminal (50 s) + .srt piégé
+python tests/make_test_video.py v2s_test        # fake terminal tutorial (50 s) + a misleading .srt
 python scripts/extract.py v2s_test/tuto_venv.mp4 --out v2s_work
 python scripts/validate_skill.py examples/python-venv-requests
 ```
-`examples/python-venv-requests/` est le skill que Claude a généré à partir de cette vidéo de test (6/6 étapes rejouées avec succès).
+`examples/python-venv-requests/` is the skill Claude generated from that test video (6/6 steps replayed successfully).
 
-## Limites
+## Limitations
 
-- Claude voit des **images clés**, pas un flux continu : un geste rapide entre deux états stables peut échapper → `frame_at.py --window` pour densifier.
-- Les démonstrations physiques (cuisine, sport, bricolage) perdent du détail ; c'est fait pour les écrans, les slides et les tableaux.
-- Les étapes d'interface graphique ne sont pas rejouables automatiquement : elles sont marquées « non vérifiées ».
-- Vidéo longue : découpée en parties traitées par des sous-agents (Claude Code). Sans sous-agents (claude.ai), les parties sont traitées l'une après l'autre, ce qui est moins fiable.
-- SponsorBlock ne couvre que les vidéos balisées par sa communauté ; le reste du tri est fait par Claude.
+- Claude sees **key frames**, not a continuous stream: a quick gesture between two settled states can slip through → `frame_at.py --window` to densify.
+- Physical demonstrations (cooking, sport, DIY) lose detail; the tool is built for screens, slides and whiteboards.
+- GUI steps cannot be replayed automatically: they are marked "not verified".
+- Long videos are split into parts handled by sub-agents (Claude Code). Without sub-agents (claude.ai), parts are processed one after another, which is less reliable.
+- SponsorBlock only covers videos tagged by its community; Claude filters the rest.
+- Cost: a dense sub-agent uses ~250k tokens and 6–7 minutes per 45-minute part.
 
 ## Structure
 
 ```
-SKILL.md                  instructions que Claude suit
-LLM_SETUP.md              guide d'installation pour un agent IA (Whisper, ffmpeg, yt-dlp, dépannage)
-CLAUDE.md                 point d'entrée lu automatiquement par Claude Code (tout le déroulé)
-AGENTS.md                 pointeur pour les autres agents IA
-.claude/commands/         commande /video-to-skill
-skills_out/               skills générés
-scripts/bootstrap.py      installation + vérification de tout, multi-OS, rapport JSON
-scripts/download.py       téléchargement YouTube & co (vidéo, sous-titres, chapitres, playlists)
-scripts/extract.py        ingestion, transcription, états d'écran, planches, timeline, SponsorBlock
-scripts/parts.py          découpage des vidéos longues en parties (une par sous-agent)
-scripts/assemble.py       contrôle des notes des sous-agents + assemblage en un skill
-references/part-agent-prompt.md, part-notes-template.md   consigne et format des notes des sous-agents
-scripts/frame_at.py       zoom temporel / recadrage
-scripts/validate_skill.py lint du skill généré (frontmatter, secrets, citations, liens)
-scripts/_common.py        recherche de ffmpeg / runtime JS, pip, console UTF-8
-references/skill-template.md  squelette + règles d'écriture du skill généré
-tests/make_test_video.py  vidéo de test
-examples/                 skill généré par le test
-install.sh, install.ps1   raccourcis vers bootstrap.py
+SKILL.md                  instructions Claude follows
+CLAUDE.md                 entry point read automatically by Claude Code (the whole workflow)
+AGENTS.md                 pointer for other AI agents
+LLM_SETUP.md              setup guide for an AI agent (Whisper, ffmpeg, yt-dlp, troubleshooting)
+.claude/commands/         /video-to-skill command
+skills_out/               generated skills
+scripts/bootstrap.py      install + verify everything, cross-platform, JSON report
+scripts/download.py       YouTube & co download (video, subtitles, chapters, playlists)
+scripts/extract.py        ingestion, transcript, screen states, contact sheets, timeline, SponsorBlock
+scripts/parts.py          long-video split into parts (one per sub-agent)
+scripts/assemble.py       sub-agent notes check + assembly into one skill
+scripts/frame_at.py       time zoom / crop
+scripts/validate_skill.py lint for the generated skill (frontmatter, secrets, citations, links)
+scripts/_common.py        ffmpeg / JS runtime lookup, pip, UTF-8 console
+references/skill-template.md  skeleton + writing rules for the generated skill
+references/part-agent-prompt.md, part-notes-template.md   sub-agent prompt and notes format
+tests/make_test_video.py  test video
+examples/                 skill generated by the test
+install.sh, install.ps1   shortcuts to bootstrap.py
 ```
 
-Licence MIT.
+MIT License.

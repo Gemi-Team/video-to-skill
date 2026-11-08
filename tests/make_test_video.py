@@ -56,16 +56,16 @@ def term(lines):
 
 def main():
     if not all(ensure_ffmpeg()):
-        sys.exit("ffmpeg manquant : python scripts/bootstrap.py")
+        sys.exit("ffmpeg missing: python scripts/bootstrap.py")
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "v2s_test")
     out.mkdir(parents=True, exist_ok=True)
     fr = out / "_frames"
     fr.mkdir(exist_ok=True)
     seq = []  # (image, duration)
 
-    seq.append((slide("Python : environnement virtuel", "Créer un venv, installer requests, figer les dépendances"), 5))
+    seq.append((slide("Python: virtual environment", "Create a venv, install requests, freeze dependencies"), 5))
     hist = []
-    prompt = "~/projet $ "
+    prompt = "~/project $ "
 
     def typed(cmd, outputs, hold=4.0):
         nonlocal prompt
@@ -79,7 +79,7 @@ def main():
     seq.append((term([prompt + "█"]), 2))
     typed("python3 -m venv .venv", [])
     typed("source .venv/bin/activate", [])
-    prompt = "(.venv) ~/projet $ "
+    prompt = "(.venv) ~/project $ "
     seq.append((term(hist + [prompt + "█"]), 2))
     typed("pip install requests==2.32.3",
           ["Collecting requests==2.32.3", "  Downloading requests-2.32.3-py3-none-any.whl (64 kB)",
@@ -89,7 +89,7 @@ def main():
     typed("python -c \"import requests; print(requests.__version__)\"", ["2.32.3"])
     typed("pip freeze > requirements.txt", [])
     typed("grep requests requirements.txt", ["requests==2.32.3"], hold=4)
-    seq.append((slide("Merci d'avoir regardé !", "Abonnez-vous pour plus de tutos"), 4))
+    seq.append((slide("Thanks for watching!", "Subscribe for more tutorials"), 4))
 
     lst = []
     t = 0.0
@@ -107,13 +107,13 @@ def main():
                     str(video)], check=True)
 
     srt = [
-        (0.5, 5, "Salut ! Dans cette vidéo on va voir comment créer un environnement virtuel Python."),
-        (7, 11, "D'abord on crée le venv avec python -m venv."),
-        (12, 15, "Ensuite on l'active avec source."),
-        (17, 24, "Maintenant on installe request, version 2.32."),
-        (25, 31, "On vérifie que ça marche en affichant la version."),
-        (32, 39, "Et enfin on fige les dépendances dans un fichier requirements."),
-        (t - 4, t - 0.5, "Merci d'avoir regardé, abonnez-vous !"),
+        (0.5, 5, "Hi! In this video we'll see how to create a Python virtual environment."),
+        (7, 11, "First we create the venv with python -m venv."),
+        (12, 15, "Then we activate it with source."),
+        (17, 24, "Now we install request, version 2.32."),
+        (25, 31, "We check that it works by printing the version."),
+        (32, 39, "And finally we freeze the dependencies into a requirements file."),
+        (t - 4, t - 0.5, "Thanks for watching, like and subscribe!"),
     ]
 
     def ts(x):

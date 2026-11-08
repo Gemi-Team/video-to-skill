@@ -1,8 +1,8 @@
 ---
-description: Transforme une vidéo (URL YouTube ou fichier) en skill Claude — installation, extraction image par image, sous-agents, assemblage, tout automatique.
-argument-hint: <URL ou chemin de la vidéo> [consignes, ex. « seulement 12:00–25:00 »]
+description: Turn a video (YouTube URL or file) into a Claude skill — setup, frame-by-frame extraction, sub-agents, assembly, all automatic.
+argument-hint: <video URL or path> [instructions, e.g. "only 12:00–25:00"]
 ---
-Vidéo et consignes : $ARGUMENTS
+Video and instructions: $ARGUMENTS
 
-Suis la section « Quand l'utilisateur donne une vidéo » de CLAUDE.md, de bout en bout et sans demander à l'utilisateur de lancer quoi que ce soit.
-Si aucune vidéo n'est fournie, demande seulement l'URL ou le chemin du fichier.
+Follow the "When the user gives a video" section of CLAUDE.md end to end, without asking the user to run anything.
+If no video is given, only ask for the URL or the file path.

@@ -19,7 +19,7 @@ Usage:
                     [--no-transcribe] [--subs path.srt] [--cookies-from-browser firefox]
                     [--part-minutes 45] [--frames-per-part 300] [--every 10] [--no-parts] [--no-sponsorblock]
 
-YouTube: passages tagged by SponsorBlock (sponsor, intro, self-promo…) are marked « ⏭ » and get no frames.
+YouTube: passages tagged by SponsorBlock (sponsor, intro, self-promo…) are marked "⏭" and get no frames.
 
 Only hard dependency: ffmpeg/ffprobe + Pillow.
 Optional: yt-dlp (URLs, subtitles — see download.py), faster-whisper (transcription).
@@ -42,7 +42,7 @@ from _common import ensure_ffmpeg, fmt_ts, utf8_console  # noqa: E402
 try:
     from PIL import Image, ImageDraw, ImageFont, ImageChops
 except ImportError:
-    sys.exit("Pillow manquant : python scripts/bootstrap.py  (ou pip install pillow)")
+    sys.exit("Pillow missing: python scripts/bootstrap.py  (or pip install pillow)")
 
 WARNINGS = []
 
@@ -93,7 +93,7 @@ def pick_subs(cands, lang):
     def score(p):
         n = Path(p).name.lower()
         code = Path(n).suffixes[-2][1:] if len(Path(n).suffixes) >= 2 else ""
-        # langue voulue > piste d'origine (xx-orig) > code simple « fr » > traduction « fr-de »
+        # wanted language > original track (xx-orig) > plain code "fr" > translation "fr-de"
         return (0 if lang and f".{lang}" in n else 1, 0 if "orig" in code else 1, "-" in code, n)
     return Path(sorted(cands, key=score)[0])
 
@@ -102,19 +102,19 @@ def ingest(source, out: Path, lang, cookies_browser=None):
     info = {"source": source, "title": None, "chapters": [], "description": None}
     if is_url(source):
         from download import download_one
-        for old in out.glob("video.*"):  # pas de mélange avec un ancien téléchargement
+        for old in out.glob("video.*"):  # never mix with an older download
             old.unlink()
-        log("téléchargement (≤720p) + sous-titres…")
+        log("downloading (≤720p) + subtitles…")
         r = download_one(source, out, "video.%(ext)s", lang=lang, max_height=720,
                          cookies_browser=cookies_browser, progress=False)
         if not r["ok"]:
             last = ((r["error"] or "erreur inconnue").strip().splitlines() or ["erreur inconnue"])[-1]
-            sys.exit(f"Échec du téléchargement : {last}\n"
+            sys.exit(f"Download failed: {last}\n"
                      f"→ {r['hint']}\n"
-                     "→ Sinon : télécharge la vidéo à la main et donne le fichier local.")
+                     "→ Otherwise: download the video by hand and pass the local file.")
         vids = [Path(f) for f in r["files"] if Path(f).suffix.lower() in VIDEO_EXT]
         if not vids:
-            sys.exit("Aucune vidéo téléchargée.")
+            sys.exit("No video downloaded.")
         video = vids[0]
         if r["info_json"]:
             read_info_json(Path(r["info_json"]), info)
@@ -122,7 +122,7 @@ def ingest(source, out: Path, lang, cookies_browser=None):
 
     src = Path(source).expanduser().resolve()
     if not src.exists():
-        sys.exit(f"Fichier introuvable : {src}")
+        sys.exit(f"File not found: {src}")
     video = out / ("video" + src.suffix.lower())
     if video.resolve() != src:
         if video.exists() or video.is_symlink():
@@ -132,7 +132,7 @@ def ingest(source, out: Path, lang, cookies_browser=None):
         except OSError:  # Windows sans droits de lien symbolique
             shutil.copy2(src, video)
     info["title"] = src.stem
-    # fichiers voisins : « nom.srt », « nom.fr.vtt »… et « nom.info.json » (produits par download.py)
+    # neighbouring files: "name.srt", "name.fr.vtt"… and "name.info.json" (produced by download.py)
     stem = glob.escape(str(src.with_suffix("")))
     cands = [p for ext in ("srt", "vtt") for p in glob.glob(f"{stem}.{ext}") + glob.glob(f"{stem}.*.{ext}")]
     ij = src.with_suffix(".info.json")
@@ -214,26 +214,26 @@ def whisper_transcribe(video, out: Path, model_name, lang, device="auto"):
     try:
         from faster_whisper import WhisperModel
     except ImportError:
-        warn("faster-whisper non installé (python scripts/bootstrap.py) : pas de transcription audio.")
+        warn("faster-whisper not installed (python scripts/bootstrap.py): no audio transcription.")
         return None
     wav = out / "audio.wav"
     run(["ffmpeg", "-y", "-v", "error", "-i", str(video), "-ac", "1", "-ar", "16000", str(wav)])
-    # GPU d'abord si dispo ; si CUDA/cuDNN est mal installé ça casse souvent au 1er segment → repli CPU
+    # GPU first if available; a broken CUDA/cuDNN install often fails on the 1st segment → CPU fallback
     devices = [device] if device == "cpu" else [device, "cpu"]
     try:
         for dev in devices:
             try:
-                log(f"transcription whisper ({model_name}, {dev})… (peut prendre un moment)")
+                log(f"whisper transcription ({model_name}, {dev})… (may take a while)")
                 model = WhisperModel(model_name, device=dev, compute_type="int8")
                 segments, meta = model.transcribe(str(wav), language=lang or None, vad_filter=True, beam_size=5)
                 segs = [{"start": s.start, "end": s.end, "text": s.text.strip()} for s in segments]
-                log(f"langue détectée : {meta.language} ({meta.language_probability:.2f})")
+                log(f"detected language: {meta.language} ({meta.language_probability:.2f})")
                 return segs
             except Exception as e:  # model download blocked, CUDA libs missing, etc.
                 last = f"{type(e).__name__}: {str(e)[:200]}"
                 if dev != devices[-1]:
-                    log(f"échec sur {dev} ({last}) → nouvel essai sur CPU")
-        warn(f"Whisper indisponible ({last}). Pas de transcription audio. Diagnostic : python scripts/bootstrap.py --check")
+                    log(f"failed on {dev} ({last}) → retrying on CPU")
+        warn(f"Whisper unavailable ({last}). No audio transcription. Diagnostics: python scripts/bootstrap.py --check")
         return None
     finally:
         wav.unlink(missing_ok=True)
@@ -299,7 +299,7 @@ def detect_states(video, meta, interval, chapters):
         prev = img
     if dur - (kept[-1]["t"] if kept else 0) > 2:
         kept.append({"t": max(0.0, dur - 0.5), "change": 0.0})
-    log(f"{len(kept)} états d'écran distincts détectés (échantillonnage {fps} img/s)")
+    log(f"{len(kept)} distinct screen states detected (sampling {fps} frames/s)")
     return kept
 
 
@@ -325,13 +325,13 @@ def reduce_states(kept, max_frames, quiet=False):
     """Keep at most max_frames: half the biggest changes, half spread evenly over the rest."""
     if len(kept) > max_frames:
         if not quiet:
-            warn(f"{len(kept)} images distinctes → réduit à {max_frames} (les plus gros changements + couverture "
-                 "régulière). Utilise frame_at.py pour zoomer sur un passage.")
+            warn(f"{len(kept)} distinct frames → reduced to {max_frames} (biggest changes + even "
+                 "coverage). Use frame_at.py to zoom into a passage.")
         first, last = kept[0], kept[-1]
         middle = kept[1:-1]
         budget = max_frames - 2
-        # moitié = plus gros changements ; autre moitié = répartie régulièrement parmi les images RESTANTES
-        # (avant, les deux listes se chevauchaient → doublons → ~76 images au lieu de 90)
+        # half = biggest changes; other half = spread evenly over the REMAINING frames
+        # (the two lists used to overlap → duplicates → ~76 frames instead of 90)
         top = sorted(middle, key=lambda k: -k["change"])[: budget // 2]
         top_ids = {id(k) for k in top}
         rest = [k for k in middle if id(k) not in top_ids]
@@ -402,7 +402,7 @@ def contact_sheets(out: Path, frames, cols=3, rows=3, tile_w=640):
 
 # ---------------------------------------------------------------- outputs
 def skip_line(s):
-    return f"⏭ [{fmt_ts(s['start'])}–{fmt_ts(s['end'])}] {s['label']} — passage ignoré (SponsorBlock)"
+    return f"⏭ [{fmt_ts(s['start'])}–{fmt_ts(s['end'])}] {s['label']} — skipped (SponsorBlock)"
 
 
 def write_transcript(path: Path, segs, skips=None, header="# Transcript"):
@@ -410,7 +410,7 @@ def write_transcript(path: Path, segs, skips=None, header="# Transcript"):
     skips = skips or []
     lines = [header, ""]
     if not segs:
-        lines.append("_(aucune transcription disponible — se fier uniquement aux images)_")
+        lines.append("_(no transcript available — rely on the frames only)_")
     else:
         buf, t0, done = [], None, set()
 
@@ -438,17 +438,17 @@ def write_transcript(path: Path, segs, skips=None, header="# Transcript"):
     path.write_text("\n\n".join(lines) + "\n", encoding="utf-8")
 
 
-def write_timeline(path: Path, frames, segs, chapters, skips=None, header="# Timeline (images + narration)",
+def write_timeline(path: Path, frames, segs, chapters, skips=None, header="# Timeline (frames + narration)",
                    start=0.0):
     """Interleave: chapter headings, key frames, and what is said between two frames."""
     skips = skips or []
-    events = [(c["start"], 0, f"\n## Chapitre : {c['title']}  [{fmt_ts(c['start'])}]\n") for c in chapters]
+    events = [(c["start"], 0, f"\n## Chapter: {c['title']}  [{fmt_ts(c['start'])}]\n") for c in chapters]
     events += [(k["start"], 0.2, skip_line(k) + "\n") for k in skips]
     keep = [s for s in segs if not in_skip((s["start"] + s["end"]) / 2, skips)]
     bounds = [fr["t"] for fr in frames] + [float("inf")]
     for i, fr in enumerate(frames):
         said = " ".join(s["text"] for s in keep if bounds[i] <= s["start"] < bounds[i + 1])
-        txt = f"### [{fr['ts']}] image #{fr['n']} → `{fr['file']}`\n"
+        txt = f"### [{fr['ts']}] frame #{fr['n']} → `{fr['file']}`\n"
         if said:
             txt += f"> {said}\n"
         events.append((fr["t"], 1, txt))
@@ -464,67 +464,67 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("source")
     ap.add_argument("--out", default="v2s_work")
-    ap.add_argument("--lang", default=None, help="langue attendue (fr, en…) ; auto si absent")
-    ap.add_argument("--interval", type=float, default=None, help="1 image min. toutes les N s (auto)")
+    ap.add_argument("--lang", default=None, help="expected language (en, fr…); auto-detected if omitted")
+    ap.add_argument("--interval", type=float, default=None, help="settled-state fallback interval in s (auto)")
     ap.add_argument("--max-frames", type=int, default=None,
-                    help="images de la vue d'ensemble (défaut : 300 pour une vidéo courte, 90 si découpée)")
+                    help="overview frames (default: 300 for a short video, 90 when split)")
     ap.add_argument("--every", type=float, default=10,
-                    help="au moins une image toutes les N secondes en plus des changements d'écran (défaut 10, 0 = non)")
+                    help="at least one frame every N seconds on top of screen changes (default 10, 0 = off)")
     ap.add_argument("--whisper-model", default="small", help="tiny, base, small, medium, large-v3, turbo…")
     ap.add_argument("--whisper-device", default="auto", choices=["auto", "cpu", "cuda"])
     ap.add_argument("--no-transcribe", action="store_true")
     ap.add_argument("--whisper", action="store_true",
-                    help="ignorer les sous-titres et transcrire avec Whisper (sous-titres auto de mauvaise qualité)")
-    ap.add_argument("--subs", default=None, help="fichier .srt/.vtt à utiliser")
-    ap.add_argument("--cookies-from-browser", default=None, metavar="NAVIGATEUR",
-                    help="pour les vidéos YouTube qui demandent une connexion (firefox, chrome, edge…)")
+                    help="ignore subtitles and transcribe with Whisper (poor auto-captions)")
+    ap.add_argument("--subs", default=None, help=".srt/.vtt file to use")
+    ap.add_argument("--cookies-from-browser", default=None, metavar="BROWSER",
+                    help="for YouTube videos that require a sign-in (firefox, chrome, edge…)")
     ap.add_argument("--part-minutes", type=float, default=45,
-                    help="au-delà, découpe en parties d'au plus N minutes (une par sous-agent). Défaut 45")
-    ap.add_argument("--frames-per-part", type=int, default=300, help="plafond d'images par partie (défaut 300)")
-    ap.add_argument("--no-parts", action="store_true", help="ne jamais découper")
-    ap.add_argument("--no-sponsorblock", action="store_true", help="ne pas interroger SponsorBlock")
+                    help="beyond this, split into parts of at most N minutes (one per sub-agent). Default 45")
+    ap.add_argument("--frames-per-part", type=int, default=300, help="frame cap per part (default 300)")
+    ap.add_argument("--no-parts", action="store_true", help="never split")
+    ap.add_argument("--no-sponsorblock", action="store_true", help="do not query SponsorBlock")
     a = ap.parse_args()
 
     if not all(ensure_ffmpeg()):
-        sys.exit("ffmpeg/ffprobe manquant : python scripts/bootstrap.py  (ou winget/brew/apt install ffmpeg)")
+        sys.exit("ffmpeg/ffprobe missing: python scripts/bootstrap.py  (or winget/brew/apt install ffmpeg)")
 
     out = Path(a.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
     video, info, subs = ingest(a.source, out, a.lang, a.cookies_from_browser)
     meta = probe(video)
     if meta["duration"] <= 0:
-        sys.exit("Durée illisible : fichier vidéo invalide ?")
+        sys.exit("Unreadable duration: invalid video file?")
     interval = a.interval or (8 if meta["duration"] < 600 else 15 if meta["duration"] < 2400 else 30)
-    log(f"« {info['title']} » — {fmt_ts(meta['duration'])}, {meta['width']}x{meta['height']}")
+    log(f"\"{info['title']}\" — {fmt_ts(meta['duration'])}, {meta['width']}x{meta['height']}")
 
     segs, tsrc = None, None
     if a.subs:
         subs = Path(a.subs)
         if not subs.exists():
-            sys.exit(f"Sous-titres introuvables : {subs}")
+            sys.exit(f"Subtitles not found: {subs}")
     if a.whisper:
         subs = None
     if subs and Path(subs).exists():
-        segs, tsrc = parse_subs(Path(subs)), f"sous-titres ({Path(subs).name})"
+        segs, tsrc = parse_subs(Path(subs)), f"subtitles ({Path(subs).name})"
     elif not a.no_transcribe and meta["has_audio"]:
         segs = whisper_transcribe(video, out, a.whisper_model, a.lang, a.whisper_device)
         tsrc = f"whisper {a.whisper_model}" if segs else None
     if not segs:
         segs = []
         if not meta["has_audio"]:
-            warn("La vidéo n'a pas de piste audio.")
-        tsrc = tsrc or "aucune"
+            warn("The video has no audio track.")
+        tsrc = tsrc or "none"
 
-    # passages inutiles signalés par la communauté (YouTube uniquement)
+    # useless segments flagged by the community (YouTube only)
     skips = []
     if info.get("video_id") and info.get("extractor") == "Youtube" and not a.no_sponsorblock:
         from download import fetch_sponsorblock
         sb = fetch_sponsorblock(info["video_id"])
         if sb is None:
-            warn("SponsorBlock injoignable : aucun passage pré-filtré.")
+            warn("SponsorBlock unreachable: no segment pre-filtered.")
         else:
             skips = sb
-            log(f"SponsorBlock : {len(skips)} passage(s) à sauter"
+            log(f"SponsorBlock: {len(skips)} segment(s) to skip"
                 + (f" ({sum(s['end'] - s['start'] for s in skips) / 60:.1f} min)" if skips else ""))
 
     states = detect_states(video, meta, interval, info["chapters"])
@@ -532,12 +532,12 @@ def main():
     (out / "segments.json").write_text(json.dumps(segs, ensure_ascii=False), encoding="utf-8")
     split = not a.no_parts and meta["duration"] > a.part_minutes * 60
     useful = [s for s in states if not in_skip(s["t"], skips)] or states
-    if split:  # vue d'ensemble pour l'orchestrateur ; la couverture dense est faite partie par partie
+    if split:  # overview for the orchestrator; dense coverage is done part by part
         frames = grab_frames(video, reduce_states(useful, a.max_frames or 90), out)
-    else:      # vidéo courte : Claude regarde tout lui-même → changements d'écran + 1 image / --every s
+    else:      # short video: Claude watches everything itself → screen changes + 1 frame / --every s
         dense = [s for s in with_grid(useful, 0, meta["duration"], a.every) if not in_skip(s["t"], skips)]
         frames = grab_frames(video, reduce_states(dense, a.max_frames or 300), out)
-    log(f"{len(frames)} images extraites")
+    log(f"{len(frames)} frames extracted")
     sheets = contact_sheets(out, frames)
     write_transcript(out / "transcript.md", segs, skips)
     write_timeline(out / "timeline.md", frames, segs, info["chapters"], skips)
@@ -551,7 +551,7 @@ def main():
 
     if split:
         from parts import build_parts
-        log(f"vidéo > {a.part_minutes:g} min → découpage en parties (une par sous-agent)")
+        log(f"video > {a.part_minutes:g} min → splitting into parts (one per sub-agent)")
         manifest["parts"] = build_parts(out, max_minutes=a.part_minutes, frames_per_part=a.frames_per_part,
                                         every=a.every)
         manifest["warnings"] = WARNINGS
@@ -560,8 +560,8 @@ def main():
     print(json.dumps({"out": str(out), "title": info["title"], "duration": fmt_ts(meta["duration"]),
                       "transcript": tsrc, "frames": len(frames), "sheets": len(sheets),
                       "skipped": [f"{fmt_ts(s['start'])}–{fmt_ts(s['end'])} {s['label']}" for s in skips],
-                      "parts": [f"{p['dir']}  {p['from']}–{p['to']}  ({len(p['frames'])} images, "
-                                f"{len(p['sheets'])} planches, {p['words']} mots)"
+                      "parts": [f"{p['dir']}  {p['from']}–{p['to']}  ({len(p['frames'])} frames, "
+                                f"{len(p['sheets'])} sheets, {p['words']} words)"
                                 for p in manifest["parts"]],
                       "warnings": WARNINGS}, ensure_ascii=False, indent=2))
 

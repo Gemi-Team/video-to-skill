@@ -6,7 +6,7 @@ validate_skill.py — lint a generated skill folder before installing it.
 
 Errors (exit 1): missing/invalid frontmatter, bad name, description too long, secrets,
 broken relative links. Warnings: no timestamp citations, video narration left in,
-body too long, unverified steps not flagged.
+body too long, no Source section.
 """
 import re
 import sys
@@ -16,13 +16,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import utf8_console  # noqa: E402
 
 SECRET_PATTERNS = [
-    (r"sk-[A-Za-z0-9_-]{20,}", "clé API style OpenAI/Anthropic"),
-    (r"ghp_[A-Za-z0-9]{30,}", "token GitHub"),
-    (r"AKIA[0-9A-Z]{16}", "clé AWS"),
-    (r"xox[baprs]-[A-Za-z0-9-]{10,}", "token Slack"),
-    (r"(?i)(password|passwd|mot de passe|secret|api[_-]?key)\s*[:=]\s*['\"]?[^\s'\"<>{}]{6,}", "mot de passe / secret en clair"),
-    (r"-----BEGIN [A-Z ]*PRIVATE KEY-----", "clé privée"),
+    (r"sk-[A-Za-z0-9_-]{20,}", "OpenAI/Anthropic-style API key"),
+    (r"ghp_[A-Za-z0-9]{30,}", "GitHub token"),
+    (r"AKIA[0-9A-Z]{16}", "AWS key"),
+    (r"xox[baprs]-[A-Za-z0-9-]{10,}", "Slack token"),
+    (r"(?i)(password|passwd|mot de passe|secret|api[_-]?key)\s*[:=]\s*['\"]?[^\s'\"<>{}]{6,}", "plain-text password / secret"),
+    (r"-----BEGIN [A-Z ]*PRIVATE KEY-----", "private key"),
 ]
+# narration patterns (English and French videos)
 NARRATION = [
     r"(?i)\bin this video\b", r"(?i)\bdans cette vid[ée]o\b", r"(?i)\bsubscribe\b", r"(?i)\babonnez\b",
     r"(?i)\bsmash (that|the) like\b", r"(?i)\blike and subscribe\b", r"(?i)\bso what we'?re gonna do\b",
@@ -51,30 +52,30 @@ def main():
     root = skill.parent
     errors, warns = [], []
     if not skill.exists():
-        sys.exit(f"ERREUR: {skill} introuvable")
+        sys.exit(f"ERROR: {skill} not found")
     text = skill.read_text(encoding="utf-8")
     fm, body = parse_frontmatter(text)
 
     if fm is None:
-        errors.append("frontmatter YAML absent (--- name/description --- en tête du fichier)")
+        errors.append("YAML frontmatter missing (--- name/description --- at the top of the file)")
         fm = {}
     name, desc = fm.get("name", ""), fm.get("description", "")
     if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", name or ""):
-        errors.append(f"name invalide « {name} » : kebab-case minuscules attendu")
+        errors.append(f"invalid name \"{name}\": lower-case kebab-case expected")
     if len(name) > 64:
-        errors.append("name > 64 caractères")
+        errors.append("name > 64 characters")
     if re.search(r"claude|anthropic", name):
-        errors.append("name ne doit pas contenir 'claude' ou 'anthropic'")
+        errors.append("name must not contain 'claude' or 'anthropic'")
     if name and root.name != name and root.name not in ("", "."):
-        warns.append(f"le dossier « {root.name} » ne correspond pas au name « {name} »")
+        warns.append(f"folder \"{root.name}\" does not match name \"{name}\"")
     if not desc:
-        errors.append("description vide")
+        errors.append("empty description")
     elif len(desc) > 1024:
-        errors.append(f"description trop longue ({len(desc)} > 1024)")
+        errors.append(f"description too long ({len(desc)} > 1024)")
     elif len(desc) < 60:
-        warns.append("description très courte : dis QUAND utiliser le skill (déclencheurs)")
+        warns.append("very short description: say WHEN to use the skill (triggers)")
     if "<" in desc or ">" in desc:
-        errors.append("description ne doit pas contenir < ou >")
+        errors.append("description must not contain < or >")
 
     files = [skill] + [p for p in root.rglob("*") if p.is_file() and p != skill and p.suffix in (".md", ".txt", ".py", ".sh", ".json", ".yaml", ".yml")]
     for f in files:
@@ -84,34 +85,34 @@ def main():
                 frag = m.group(0)
                 if re.search(r"(?i)<[^>]+>|\$\{?[A-Z_]+|your[_-]|votre|xxx|\*\*\*|example|exemple|placeholder|changeme", frag):
                     continue
-                errors.append(f"{f.relative_to(root)}: possible {label} : « {frag[:24]}… » → remplace par un placeholder")
+                errors.append(f"{f.relative_to(root)}: possible {label}: \"{frag[:24]}…\" → replace with a placeholder")
 
     for link in re.findall(r"\]\(([^)#\s]+)\)", body):
         if not re.match(r"^[a-z]+://", link) and not (root / link).exists():
-            errors.append(f"lien relatif cassé : {link}")
+            errors.append(f"broken relative link: {link}")
 
     n_lines = body.count("\n")
     if n_lines > 500:
-        warns.append(f"SKILL.md fait {n_lines} lignes : déplace la théorie dans references/ (cible < 500)")
+        warns.append(f"SKILL.md has {n_lines} lines: move theory to references/ (target < 500)")
     cites = re.findall(r"\[t=\d+:\d{2}(?::\d{2})?\]", text)
     if not cites:
-        warns.append("aucune citation [t=MM:SS] : impossible de retracer les étapes vers la vidéo")
+        warns.append("no [t=MM:SS] citation: steps cannot be traced back to the video")
     for pat in NARRATION:
         m = re.search(pat, body)
         if m:
-            warns.append(f"narration de vidéo restée dans le texte (« {m.group(0)} ») → réécris en instruction")
+            warns.append(f"video narration left in the text (\"{m.group(0)}\") → rewrite as an instruction")
     if not re.search(r"(?i)source|provenance", text):
-        warns.append("pas de section Source (URL/titre de la vidéo)")
+        warns.append("no Source section (video URL/title)")
 
-    print(f"Skill : {name or '?'}  |  {n_lines} lignes  |  {len(cites)} citations temporelles  |  {len(files)} fichiers")
+    print(f"Skill: {name or '?'}  |  {n_lines} lines  |  {len(cites)} timestamp citations  |  {len(files)} files")
     for w in warns:
         print(f"  ⚠  {w}")
     for e in errors:
         print(f"  ✗  {e}")
     if errors:
-        print("ÉCHEC")
+        print("FAILED")
         sys.exit(1)
-    print("OK" + (" (avec avertissements)" if warns else ""))
+    print("OK" + (" (with warnings)" if warns else ""))
 
 
 if __name__ == "__main__":

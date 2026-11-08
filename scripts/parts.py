@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-parts.py — découpe une vidéo longue (déjà passée dans extract.py) en parties autonomes,
-une par sous-agent. Rapide : réutilise states.json / segments.json, ne ré-analyse pas la vidéo.
+parts.py — splits a long video (already processed by extract.py) into self-contained parts,
+one per sub-agent. Fast: reuses states.json / segments.json, does not re-analyse the video.
 
-  python scripts/parts.py v2s_work --plan                        # montre le découpage, n'écrit rien
-  python scripts/parts.py v2s_work                               # auto : chapitres regroupés, ≤ 45 min/partie
+  python scripts/parts.py v2s_work --plan                        # show the split, write nothing
+  python scripts/parts.py v2s_work                               # auto: chapters grouped, ≤ 45 min per part
   python scripts/parts.py v2s_work --max-minutes 30
-  python scripts/parts.py v2s_work --at 38:00,1:18:00,2:02:00    # bornes choisies par l'orchestrateur
-  python scripts/parts.py v2s_work --only 2,3                    # ne (re)générer que ces parties
-  python scripts/parts.py v2s_work --every 5                     # couverture encore plus dense (1 image / 5 s)
+  python scripts/parts.py v2s_work --at 38:00,1:18:00,2:02:00    # boundaries chosen by the orchestrator
+  python scripts/parts.py v2s_work --only 2,3                    # only (re)generate these parts
+  python scripts/parts.py v2s_work --every 5                     # even denser coverage (1 frame / 5 s)
 
-Images d'une partie = chaque changement d'écran détecté (analyse à 2 img/s) + au moins 1 image toutes
-les --every secondes (10 par défaut), plafonnées à --frames-per-part (300).
-Chaque partie part_NN/ contient : transcript.md, timeline.md, frames/, sheets/, part.json et
-AGENT_PROMPT.md (la consigne complète du sous-agent, qui écrit ses notes dans v2s_work/notes/part_NN.md).
-Les horodatages restent ceux de la vidéo complète (les citations [t=…] restent justes).
+Frames of a part = every detected screen change (analysed at 2 frames/s) + at least 1 frame every
+--every seconds (10 by default), capped at --frames-per-part (300).
+Each part_NN/ folder holds: transcript.md, timeline.md, frames/, sheets/, part.json and
+AGENT_PROMPT.md (the sub-agent's full instructions; it writes its notes to v2s_work/notes/part_NN.md).
+Timestamps stay in full-video time (citations [t=…] remain correct).
 """
 import argparse
 import json
@@ -118,7 +118,7 @@ def build_parts(work, max_minutes=45, frames_per_part=300, at=None, only=None, p
         pchap = [c for c in chapters if start <= c["start"] < end]
         before = [c for c in chapters if c["start"] < start]
         if before and not any(abs(c["start"] - start) < 1 for c in pchap):
-            pchap.insert(0, {"start": start, "title": before[-1]["title"] + " (suite)"})
+            pchap.insert(0, {"start": start, "title": before[-1]["title"] + " (continued)"})
         psegs = [s for s in segs if start <= s["start"] < end]
         pskips = [k for k in skips if k["end"] > start and k["start"] < end]
         skipped = sum(min(k["end"], end) - max(k["start"], start) for k in pskips)
@@ -132,9 +132,9 @@ def build_parts(work, max_minutes=45, frames_per_part=300, at=None, only=None, p
         return [{k: v for k, v in p.items() if not k.startswith("_")} for p in parts]
 
     if not all(ensure_ffmpeg()):
-        sys.exit("ffmpeg manquant : python scripts/bootstrap.py")
+        sys.exit("ffmpeg missing: python scripts/bootstrap.py")
     if not PROMPT_TEMPLATE.exists():
-        sys.exit(f"modèle introuvable : {PROMPT_TEMPLATE} (réinstalle le skill avec scripts/bootstrap.py)")
+        sys.exit(f"template not found: {PROMPT_TEMPLATE} (reinstall the skill with scripts/bootstrap.py)")
     prompt_tpl = PROMPT_TEMPLATE.read_text(encoding="utf-8")
     notes_tpl = NOTES_TEMPLATE.read_text(encoding="utf-8") if NOTES_TEMPLATE.exists() else ""
     (work / "notes").mkdir(exist_ok=True)
@@ -156,15 +156,15 @@ def build_parts(work, max_minutes=45, frames_per_part=300, at=None, only=None, p
             pstates.insert(0, {"t": round(start + 0.5, 2), "change": 1.0})
         pstates = [s for s in with_grid(pstates, start, end, every) if not in_skip(s["t"], pskips)]
         if len(pstates) > frames_per_part:
-            log(f"{p['dir']} : {len(pstates)} images → plafonnées à {frames_per_part} (--frames-per-part)")
-        log(f"{p['dir']} : {p['from']}–{p['to']} ({p['minutes']} min, {p['words']} mots)")
+            log(f"{p['dir']}: {len(pstates)} frames → capped at {frames_per_part} (--frames-per-part)")
+        log(f"{p['dir']}: {p['from']}–{p['to']} ({p['minutes']} min, {p['words']} words)")
         frames = grab_frames(video, reduce_states(pstates, frames_per_part, quiet=True), pdir)
         sheets = contact_sheets(pdir, frames)
         psegs, pchap = p.pop("_segs"), p.pop("_chapters")
-        head = f"partie {p['n']}/{total} — {p['from']} → {p['to']} — « {man.get('title')} »"
+        head = f"part {p['n']}/{total} — {p['from']} → {p['to']} — \"{man.get('title')}\""
         write_transcript(pdir / "transcript.md", psegs, pskips, header=f"# Transcript — {head}")
         write_timeline(pdir / "timeline.md", frames, psegs, pchap, pskips,
-                       header=f"# Timeline — {head}\n\nHorodatages = temps de la vidéo complète.", start=start)
+                       header=f"# Timeline — {head}\n\nTimestamps = full-video time.", start=start)
         p.update(frames=[f["file"] for f in frames], sheets=[s["file"] for s in sheets],
                  skipped=[f"{fmt_ts(k['start'])}–{fmt_ts(k['end'])} {k['label']}" for k in pskips])
         (pdir / "part.json").write_text(json.dumps(p, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -174,9 +174,9 @@ def build_parts(work, max_minutes=45, frames_per_part=300, at=None, only=None, p
             "PART_DIR": pdir, "WORK_DIR": rel(work), "SCRIPTS_DIR": rel(HERE), "NOTES_FILE": work / p["notes"],
             "NSHEETS": len(p["sheets"]), "NFRAMES": len(p["frames"]), "EVERY": f"{every:g}",
             "SHEET_LIST": "\n".join(f"- {Path(s).stem}" for s in p["sheets"]),
-            "CHAPTERS": "\n".join(f"- {c}" for c in p["chapters"]) or "- (pas de chapitre)",
+            "CHAPTERS": "\n".join(f"- {c}" for c in p["chapters"]) or "- (no chapter)",
             "SHEETS": ", ".join(f"`{s}`" for s in p["sheets"]),
-            "SKIPPED": "\n".join(f"- ⏭ {s}" for s in p["skipped"]) or "- (aucun passage pré-filtré)",
+            "SKIPPED": "\n".join(f"- ⏭ {s}" for s in p["skipped"]) or "- (no segment pre-filtered)",
             "NOTES_TEMPLATE": notes_tpl}), encoding="utf-8")
         p["prompt"] = f"{p['dir']}/AGENT_PROMPT.md"
 
@@ -197,18 +197,18 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("work")
     ap.add_argument("--max-minutes", type=float, default=45)
-    ap.add_argument("--at", default=None, help="bornes explicites, ex. 38:00,1:18:00,2:02:00")
+    ap.add_argument("--at", default=None, help="explicit boundaries, e.g. 38:00,1:18:00,2:02:00")
     ap.add_argument("--frames-per-part", type=int, default=300)
-    ap.add_argument("--every", type=float, default=None, help="1 image min. toutes les N s (défaut : celui d'extract.py)")
-    ap.add_argument("--only", default=None, help="numéros de parties à régénérer, ex. 2,3")
-    ap.add_argument("--plan", action="store_true", help="afficher le découpage sans rien générer")
+    ap.add_argument("--every", type=float, default=None, help="at least 1 frame every N s (default: extract.py's value)")
+    ap.add_argument("--only", default=None, help="part numbers to regenerate, e.g. 2,3")
+    ap.add_argument("--plan", action="store_true", help="show the split without generating anything")
     a = ap.parse_args()
     only = {int(x) for x in a.only.split(",")} if a.only else None
     parts = build_parts(a.work, a.max_minutes, a.frames_per_part, a.at, only, a.plan, a.every)
     for p in parts:
-        print(f"  {p['dir']}  {p['from']:>8} → {p['to']:>8}  {p['minutes']:5.1f} min  {p['words']:6d} mots"
+        print(f"  {p['dir']}  {p['from']:>8} → {p['to']:>8}  {p['minutes']:5.1f} min  {p['words']:6d} words"
               + (f"  ⏭ {p['skipped_minutes']} min" if p["skipped_minutes"] else "")
-              + (f"  {len(p['frames'])} img / {len(p['sheets'])} planches" if p.get("sheets") else "")
+              + (f"  {len(p['frames'])} frames / {len(p['sheets'])} sheets" if p.get("sheets") else "")
               + f"  | {' · '.join(p['chapters'])[:90]}", file=sys.stderr)
     print(json.dumps(parts, ensure_ascii=False, indent=2))
 

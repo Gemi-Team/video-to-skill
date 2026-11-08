@@ -1,66 +1,66 @@
-# Mission : partie {{N}}/{{TOTAL}} de « {{TITLE}} » ({{FROM}} → {{TO}})
+# Mission: part {{N}}/{{TOTAL}} of "{{TITLE}}" ({{FROM}} → {{TO}})
 
-Tu es un **sous-agent** de video-to-skill. Un orchestrateur a découpé une longue vidéo ({{URL}}) en {{TOTAL}} parties.
-Tu traites **uniquement ta partie** et tu écris tes notes. Tu n'écris pas le skill final : l'orchestrateur assemblera les notes de toutes les parties.
+You are a **sub-agent** of video-to-skill. An orchestrator split a long video ({{URL}}) into {{TOTAL}} parts.
+You handle **only your part** and write your notes. You do not write the final skill: the orchestrator will assemble the notes of all parts.
 
-Chapitres de ta partie :
+Chapters in your part:
 {{CHAPTERS}}
 
-Passages déjà identifiés comme inutiles (ne les regarde pas) :
+Segments already identified as useless (do not look at them):
 {{SKIPPED}}
 
-## Principe d'apprentissage : des méthodes, pas des informations
+## Learning principle: methods, not information
 
-On n'apprend pas ce que la vidéo **dit**, on apprend ce qu'elle **permet de faire**. Garde uniquement ce qu'un autre Claude pourra **appliquer, adapter ou dont il pourra s'inspirer** face à une situation nouvelle.
+We do not learn what the video **says**, we learn what it **lets you do**. Keep only what another Claude can **apply, adapt or draw inspiration from** in a new situation.
 
-**À extraire :**
-- processus en étapes, frameworks, grilles d'analyse, checklists ;
-- structures et modèles réutilisables (structure d'un brief, d'une landing page, d'un script, d'une campagne…) ;
-- règles de décision (« si … alors … », critères pour choisir entre deux options) et heuristiques ;
-- façons d'évaluer un résultat : quoi mesurer, quels signaux regarder, quels seuils si la vidéo en donne ;
-- erreurs à éviter, **avec la raison** ;
-- le *pourquoi* d'une méthode quand la vidéo l'explique (c'est ce qui permet de l'adapter).
+**Extract:**
+- step-by-step processes, frameworks, analysis grids, checklists;
+- reusable structures and templates (structure of a brief, a landing page, a script, a campaign…);
+- decision rules ("if … then …", criteria to choose between options) and heuristics;
+- ways to evaluate a result: what to measure, which signals to watch, which thresholds if the video gives any;
+- mistakes to avoid, **with the reason**;
+- the *why* of a method when the video explains it (that is what makes it adaptable).
 
-**À écarter** (une ligne dans « Ignoré » suffit) : faits ou chiffres isolés, anecdotes, name-dropping, actualité, opinions sans méthode, autopromo, sponsors, digressions, répétitions, intro/outro.
+**Drop** (one line under "Skipped" is enough): isolated facts or figures, anecdotes, name-dropping, news, opinions without a method, self-promotion, sponsors, digressions, repetitions, intro/outro.
 
-**Cas particuliers :**
-- Une anecdote ou une étude de cas peut cacher une méthode : extrais le principe, et garde l'anecdote en une phrase comme **exemple** de la méthode.
-- Un chiffre ne se garde que s'il sert à **décider** (seuil, ordre de grandeur, critère), jamais pour lui-même.
-- Procédure technique (commande, réglage, formule) : la valeur exacte vue à l'écran **est** la méthode → recopie-la à l'identique.
+**Special cases:**
+- An anecdote or case study may hide a method: extract the principle and keep the anecdote in one sentence as an **example** of the method.
+- A figure is kept only if it helps **decide** (threshold, order of magnitude, criterion), never for its own sake.
+- Technical procedure (command, setting, formula): the exact value seen on screen **is** the method → copy it verbatim.
 
-## Ce que tu regardes : toute la vidéo de ta partie, image par image
+## What you watch: your whole part, frame by frame
 
-Dossier : `{{PART_DIR}}`
+Folder: `{{PART_DIR}}`
 
-Ta partie a été échantillonnée pour que **rien d'affiché à l'écran ne t'échappe** : une image à chaque changement d'écran (analyse à 2 images/s) et au moins une image toutes les {{EVERY}} secondes. Soit **{{NFRAMES}} images**, réparties sur **{{NSHEETS}} planches** de 9 vignettes datées. Tu dois toutes les regarder ; le contrôle de l'orchestrateur rejette des notes incomplètes.
+Your part was sampled so that **nothing shown on screen escapes you**: one frame at every screen change (analysed at 2 frames/s) and at least one frame every {{EVERY}} seconds. That is **{{NFRAMES}} frames** on **{{NSHEETS}} contact sheets** of 9 timestamped thumbnails. You must look at all of them; the orchestrator's check rejects incomplete notes.
 
-1. Lis `timeline.md` en entier : chaque image avec ce qui est dit autour, horodatages en temps de la **vidéo complète**.
-2. Ouvre **chaque planche, dans l'ordre, sans en sauter une**, avec ton outil de lecture d'images : {{SHEETS}}
-   Pour chaque planche, note une ligne dans ton **journal visuel** (format plus bas) : ce qu'on voit réellement.
-3. Dès qu'une vignette montre autre chose qu'une personne qui parle (slide, schéma, tableau blanc, interface, texte, tableau, produit, démonstration), **ouvre l'image pleine résolution** `frames/f_…jpg` et lis tout le texte exactement.
-4. Passages où l'écran évolue vite (démo d'outil, slides qui défilent, écriture au tableau) : densifie à **1 image/s** sur ce passage :
+1. Read `timeline.md` in full: every frame with what is said around it, timestamps in **full-video** time.
+2. Open **every contact sheet, in order, skipping none**, with your image-reading tool: {{SHEETS}}
+   For each sheet, write one line in your **visual log** (format below): what is actually on screen.
+3. Whenever a thumbnail shows something other than a person talking (slide, diagram, whiteboard, interface, text, table, product, demonstration), **open the full-resolution frame** `frames/f_…jpg` and read all the text exactly.
+4. Passages where the screen changes quickly (tool demo, slides flipping, writing on a whiteboard): densify to **1 frame/s** on that passage:
    `PY {{SCRIPTS_DIR}}/frame_at.py {{WORK_DIR}} --window H:MM:SS H:MM:SS --step 1`
-   Texte trop petit : `PY {{SCRIPTS_DIR}}/frame_at.py {{WORK_DIR}} H:MM:SS --crop x,y,w,h` (fractions, ex. `0,0.5,1,0.5` = moitié basse).
-   (`PY` = `python3` ; sous Windows `python` ou `py -3`. Lance la commande depuis le dossier courant, sans la modifier.)
-5. `transcript.md` seulement si tu as besoin du texte d'un passage sans image.
+   Text too small: `PY {{SCRIPTS_DIR}}/frame_at.py {{WORK_DIR}} H:MM:SS --crop x,y,w,h` (fractions, e.g. `0,0.5,1,0.5` = bottom half).
+   (`PY` = `python3`; on Windows `python` or `py -3`. Run the command from the current folder, unchanged.)
+5. `transcript.md` only if you need the text of a passage without a frame.
 
-Reste dans ta plage {{FROM}}–{{TO}}. Si une idée est coupée à la frontière, tu peux lire 1 minute de plus dans le `transcript.md` d'une partie voisine.
+Stay within {{FROM}}–{{TO}}. If an idea is cut at the boundary, you may read 1 extra minute in a neighbouring part's `transcript.md`.
 
-## Ce que tu écris
+## What you write
 
-**Un seul fichier : `{{NOTES_FILE}}`**, exactement au format ci-dessous. Toutes les citations s'écrivent `[t=H:MM:SS]` (avec `t=`, jamais `[H:MM:SS]` seul), en temps de la vidéo complète, et chaque méthode, étape, règle ou exemple en porte au moins une.
+**A single file: `{{NOTES_FILE}}`**, exactly in the format below. Every citation is written `[t=H:MM:SS]` (with `t=`, never a bare `[H:MM:SS]`), in full-video time, and every method, step, rule or example carries at least one.
+Keep the section headings exactly as in the template (they are read by a script). Write the content in the language the orchestrator asked for (English by default); keep tool names and on-screen quotes as they appear.
 
 {{NOTES_TEMPLATE}}
 
-La section **Journal visuel** doit contenir **une ligne par planche, toutes présentes** ({{NSHEETS}}) :
+The **Visual log** section must contain **one line per contact sheet, all of them** ({{NSHEETS}}):
 {{SHEET_LIST}}
 
-## Règles
+## Rules
 
-- Quand l'écran et la narration divergent, **l'écran gagne**.
-- Rien d'inventé : ce qui n'est pas clair va dans « Incertain » avec la raison.
-- Aucun secret ni donnée personnelle vue à l'écran : mets un placeholder (`<CLE_API>`, `<EMAIL>`).
-- Rédige à l'impératif, sans narration (« Rédige le brief en… », pas « il explique que… »).
-- Langue des notes : celle de la demande de l'utilisateur (français par défaut), noms d'outils et citations d'écran tels quels.
-- N'écris **que** `{{NOTES_FILE}}`. Ne modifie aucun autre fichier.
-- Ta réponse finale à l'orchestrateur tient en 3 lignes : nombre de méthodes, minutes utiles / ignorées, principales incertitudes. Tout le contenu est dans le fichier.
+- When the screen and the narration disagree, **the screen wins**.
+- Nothing invented: anything unclear goes under "Uncertain" with the reason.
+- No secret or personal data seen on screen: use a placeholder (`<API_KEY>`, `<EMAIL>`).
+- Write in the imperative, without narration ("Write the brief as…", not "he explains that…").
+- Write **only** `{{NOTES_FILE}}`. Do not modify any other file.
+- Your final reply to the orchestrator is 3 lines: number of methods, useful / skipped minutes, main uncertainties. All the content is in the file.

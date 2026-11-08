@@ -1,167 +1,167 @@
-# LLM_SETUP — guide d'installation pour un agent IA
+# LLM_SETUP — setup guide for an AI agent
 
-> **Tu es un LLM (Claude Code, Cursor, Codex, Copilot…) et un développeur t'a demandé d'installer ou de faire marcher ce repo.**
-> Suis ce fichier dans l'ordre. Le développeur ne doit **rien** avoir à faire, sauf s'il faut une décision ou un droit admin.
+> **You are an LLM (Claude Code, Cursor, Codex, Copilot…) and a developer asked you to install or fix this repo.**
+> Follow this file in order. The developer should have **nothing** to do, except when a decision or admin rights are needed.
 
-Ce que tu dois obtenir à la fin :
-- les dépendances Python (`pillow`, `yt-dlp[default,curl-cffi]`, `faster-whisper`) ;
-- `ffmpeg` + `ffprobe` utilisables ;
-- un runtime JavaScript pour yt-dlp (deno, node ou bun) ;
-- un modèle **Whisper** téléchargé et testé (transcription locale, hors ligne ensuite) ;
-- le skill copié dans `~/.claude/skills/video-to-skill/` (pour Claude Code) ;
-- un autotest qui passe, et un vrai téléchargement YouTube qui marche.
+What you must end up with:
+- the Python dependencies (`pillow`, `yt-dlp[default,curl-cffi]`, `faster-whisper`);
+- working `ffmpeg` + `ffprobe`;
+- a JavaScript runtime for yt-dlp (deno, node or bun);
+- a **Whisper** model downloaded and tested (local transcription, offline afterwards);
+- the skill copied to `~/.claude/skills/video-to-skill/` (for Claude Code);
+- a passing self-test, and a real YouTube download that works.
 
-**Tout ça se fait avec une seule commande : `scripts/bootstrap.py`.** Ton travail : choisir le bon Python, lancer la commande, lire le rapport, corriger les ✗, vérifier, rendre compte.
+**All of this takes a single command: `scripts/bootstrap.py`.** Your job: pick the right Python, run the command, read the report, fix the ✗, verify, report back.
 
-> Si l'utilisateur a demandé de **transformer une vidéo en skill**, ce fichier n'est qu'un détour : suis [CLAUDE.md](CLAUDE.md), qui lance `bootstrap.py --check` puis l'installation si besoin, et reviens ici seulement en cas d'échec. Dans ce repo, utilise `--no-skill` : le repo lui-même sert de skill.
+> If the user asked to **turn a video into a skill**, this file is only a detour: follow [CLAUDE.md](CLAUDE.md), which runs `bootstrap.py --check` and then the install if needed, and come back here only on failure. Inside this repo, use `--no-skill`: the repo itself is the skill.
 
 ---
 
-## Étape 0 — Trouver le bon interpréteur Python
+## Step 0 — Find the right Python interpreter
 
-Teste dans l'ordre et garde le **premier qui affiche une version ≥ 3.9** (3.11+ conseillé) :
+Try in order and keep the **first one that prints a version ≥ 3.9** (3.11+ recommended):
 
-| OS | Commandes à essayer |
+| OS | Commands to try |
 |---|---|
 | Windows | `py -3 --version` → `python --version` |
 | macOS / Linux | `python3 --version` → `python --version` |
 
-⚠ **Piège Windows** : `python3` (et parfois `python`) peut être un faux raccourci du Microsoft Store qui affiche « Python est introuvable… » ou ouvre le Store. Ce n'est **pas** un Python. Passe à la commande suivante.
+⚠ **Windows trap**: `python3` (and sometimes `python`) can be a fake Microsoft Store shortcut that prints "Python was not found…" or opens the Store. It is **not** Python. Move on to the next command.
 
-Aucun Python ≥ 3.9 ? Propose au développeur (ne le fais pas sans accord, ça modifie le système) :
-- Windows : `winget install -e --id Python.Python.3.12`
-- macOS : `brew install python@3.12`
-- Debian/Ubuntu : `sudo apt install python3 python3-pip python3-venv`
+No Python ≥ 3.9? Suggest to the developer (do not do it without approval, it changes the system):
+- Windows: `winget install -e --id Python.Python.3.12`
+- macOS: `brew install python@3.12`
+- Debian/Ubuntu: `sudo apt install python3 python3-pip python3-venv`
 
-Dans la suite, `PY` = la commande retenue (ex. `py -3`, `python3`).
+From here on, `PY` = the chosen command (e.g. `py -3`, `python3`).
 
-**Quel Python ?** Utilise celui avec lequel le skill sera lancé ensuite (en général le Python global de l'utilisateur, car Claude Code appelle `python`/`python3`). Si le développeur veut isoler les paquets, crée un venv (`PY -m venv .venv`) et utilise `.venv/Scripts/python` (Windows) ou `.venv/bin/python` — dans ce cas, signale-lui que les scripts devront être lancés avec ce Python-là.
+**Which Python?** Use the one the skill will be run with later (usually the user's global Python, since Claude Code calls `python`/`python3`). If the developer wants isolated packages, create a venv (`PY -m venv .venv`) and use `.venv/Scripts/python` (Windows) or `.venv/bin/python` — then tell them the scripts must be run with that Python.
 
 ---
 
-## Étape 1 — Lancer l'installation
+## Step 1 — Run the install
 
-Depuis la racine du repo :
+From the repo root:
 
 ```bash
 PY scripts/bootstrap.py --json
 ```
 
-- **C'est long** (2 à 10 min : téléchargement des paquets, de ffmpeg si absent, et du modèle Whisper). Donne à la commande un délai d'au moins **10 minutes** ou lance-la en arrière-plan. Ne l'interromps pas parce qu'elle est silencieuse.
-- La progression s'affiche sur stderr, le **rapport JSON** sur stdout.
-- C'est **idempotent** : tu peux relancer autant de fois que nécessaire.
-- **Aucun droit admin**, jamais de `sudo`. Si ffmpeg manque, le script essaie `winget` (Windows) / `brew` (macOS), puis se rabat sur des binaires portables via pip (`static-ffmpeg`).
+- **It takes a while** (2 to 10 min: packages, ffmpeg if missing, and the Whisper model). Give the command a timeout of at least **10 minutes** or run it in the background. Do not interrupt it because it is quiet.
+- Progress goes to stderr, the **JSON report** to stdout.
+- It is **idempotent**: rerun it as often as needed.
+- **No admin rights**, never `sudo`. If ffmpeg is missing, the script tries `winget` (Windows) / `brew` (macOS), then falls back to portable binaries via pip (`static-ffmpeg`).
 
-Options utiles :
+Useful options:
 
-| Option | Quand |
+| Option | When |
 |---|---|
-| `--check` | diagnostic seul, n'installe rien (à faire d'abord si tu veux montrer l'état au dev) |
-| `--whisper-model tiny\|base\|small\|medium\|large-v3\|turbo` | choix du modèle (défaut `small`, voir tableau plus bas) |
-| `--skip-model` | ne pas pré-télécharger le modèle (il le sera à la 1re transcription) |
-| `--minimal` | pillow + ffmpeg seulement (fichiers locaux, sans URL ni transcription) |
-| `--no-system` | n'utiliser ni winget ni brew (machine verrouillée) → pip uniquement |
-| `--no-skill` / `--project` / `--skill-dir DIR` | où copier le skill Claude Code |
-| `--test-url URL` | tester aussi un vrai téléchargement (prends une vidéo courte) |
+| `--check` | diagnostics only, installs nothing (do this first to show the developer the current state) |
+| `--whisper-model tiny\|base\|small\|medium\|large-v3\|turbo` | model choice (default `small`, see table below) |
+| `--skip-model` | do not pre-download the model (it will be fetched on the first transcription) |
+| `--minimal` | pillow + ffmpeg only (local files, no URLs, no transcription) |
+| `--no-system` | use neither winget nor brew (locked-down machine) → pip only |
+| `--no-skill` / `--project` / `--skill-dir DIR` | where to copy the Claude Code skill |
+| `--test-url URL` | also test a real download (pick a short video) |
 
-Rapport JSON :
+JSON report:
 ```json
 { "ok": true, "python": "C:\\…\\python.exe",
   "steps": [ {"name": "ffmpeg", "status": "ok|warn|fail|skip", "detail": "…", "fix": "…"} ],
   "next": ["…/python scripts/download.py <URL>", "…"] }
 ```
-`ok: true` ⇔ aucune étape en `fail`. Les `warn` sont non bloquants (mentionne-les au dev).
+`ok: true` ⇔ no step in `fail`. `warn` steps are not blocking (mention them to the developer).
 
 ---
 
-## Étape 2 — Corriger les ✗
+## Step 2 — Fix the ✗
 
-Pour chaque étape `fail`, applique son champ `fix`, puis **relance `bootstrap.py`**. Cas fréquents :
+For every `fail` step, apply its `fix` field, then **rerun `bootstrap.py`**. Common cases:
 
-| Symptôme | Cause | Correctif |
+| Symptom | Cause | Fix |
 |---|---|---|
-| `externally-managed-environment` (Debian/Ubuntu, Homebrew) | PEP 668 : pip refuse le Python système | Le script réessaie déjà avec `--user --break-system-packages`. Si ça échoue encore : crée un venv (étape 0) et relance avec ce Python |
-| `pip indisponible` | Python sans pip | `PY -m ensurepip --upgrade` ; Debian : `sudo apt install python3-pip` (demande au dev) |
-| ffmpeg introuvable après `winget` | le PATH n'est mis à jour que dans les **nouveaux** terminaux | rien à faire : les scripts cherchent aussi dans les dossiers WinGet. Sinon relance avec `--no-system` (binaires pip) |
-| `modèle whisper … fail` + erreur réseau / SSL / 403 | HuggingFace bloqué (proxy d'entreprise) | `HTTPS_PROXY=http://proxy:port` ; ou miroir `HF_ENDPOINT=https://hf-mirror.com` ; ou copier le dossier du modèle dans le cache HF d'une autre machine. Teste d'abord avec `--whisper-model tiny` |
-| `cublas64_12.dll`, `libcudnn`, `CUDA failed` | GPU NVIDIA présent mais libs CUDA 12 / cuDNN 9 absentes | Rien d'obligatoire : bascule automatique sur CPU. Pour le GPU : installer CUDA 12 + cuDNN 9 (Linux : `pip install nvidia-cublas-cu12 nvidia-cudnn-cu12`) |
-| `runtime JS … warn` | ni deno, ni node, ni bun | le script installe `deno` via pip ; sinon `winget install DenoLand.Deno` / `brew install deno` |
-| Python 3.10 `warn` | yt-dlp abandonne 3.10 | marche encore ; conseille au dev de passer à 3.11+ |
-| `certificate verify failed` | proxy qui intercepte le TLS | demande au dev le certificat de l'entreprise ; **ne désactive pas** la vérification TLS |
+| `externally-managed-environment` (Debian/Ubuntu, Homebrew) | PEP 668: pip refuses the system Python | The script already retries with `--user --break-system-packages`. If that still fails: create a venv (step 0) and rerun with that Python |
+| `pip unavailable` | Python without pip | `PY -m ensurepip --upgrade`; Debian: `sudo apt install python3-pip` (ask the developer) |
+| ffmpeg not found after `winget` | PATH is only updated in **new** terminals | nothing to do: the scripts also look in the WinGet folders. Otherwise rerun with `--no-system` (pip binaries) |
+| `whisper model … fail` + network / SSL / 403 error | HuggingFace blocked (corporate proxy) | `HTTPS_PROXY=http://proxy:port`; or mirror `HF_ENDPOINT=https://hf-mirror.com`; or copy the model folder into the HF cache from another machine. Test with `--whisper-model tiny` first |
+| `cublas64_12.dll`, `libcudnn`, `CUDA failed` | NVIDIA GPU present but CUDA 12 / cuDNN 9 libraries missing | Nothing required: automatic CPU fallback. For the GPU: install CUDA 12 + cuDNN 9 (Linux: `pip install nvidia-cublas-cu12 nvidia-cudnn-cu12`) |
+| `JS runtime … warn` | no deno, node or bun | the script installs `deno` via pip; otherwise `winget install DenoLand.Deno` / `brew install deno` |
+| Python 3.10 `warn` | yt-dlp is dropping 3.10 | still works; suggest upgrading to 3.11+ |
+| `certificate verify failed` | proxy intercepting TLS | ask the developer for the company certificate; **do not disable** TLS verification |
 
-Ne contourne jamais une protection (antivirus, politique d'entreprise, blocage réseau) : explique le blocage au développeur et propose l'alternative (fichier vidéo local, autre réseau).
+Never work around a protection (antivirus, company policy, network block): explain the block to the developer and offer the alternative (local video file, another network).
 
 ---
 
-## Étape 3 — Vérifier en conditions réelles
+## Step 3 — Verify for real
 
 ```bash
-# 1. Téléchargement YouTube (vidéo de 19 s, sous-titres + métadonnées)
+# 1. YouTube download (19-second video, subtitles + metadata)
 PY scripts/download.py "https://www.youtube.com/watch?v=jNQXAC9IVRw" --out downloads --no-progress
 
-# 2. Pipeline complet, en forçant la transcription Whisper (ignore les sous-titres YouTube)
-PY scripts/extract.py "downloads/<fichier>.mp4" --out v2s_work --whisper
+# 2. Full pipeline, forcing Whisper transcription (ignores YouTube subtitles)
+PY scripts/extract.py "downloads/<file>.mp4" --out v2s_work --whisper
 ```
-✔ Réussite : `download.py` affiche `"ok": true` ; `extract.py` affiche `"transcript": "whisper small"` (ou le modèle choisi) et `v2s_work/transcript.md` contient du texte daté `[0:00] …`.
+✔ Success: `download.py` prints `"ok": true`; `extract.py` prints `"transcript": "whisper small"` (or the chosen model) and `v2s_work/transcript.md` contains timestamped text `[0:00] …`.
 
-Supprime ensuite `downloads/` et `v2s_work/` si le dev n'en a pas besoin (ils sont dans `.gitignore`).
+Then delete `downloads/` and `v2s_work/` if the developer does not need them (they are in `.gitignore`).
 
 ---
 
-## Étape 4 — Rendre compte au développeur
+## Step 4 — Report to the developer
 
-Court, dans ce format :
+Short, in this format:
 ```
-✔ video-to-skill installé (Python 3.12, C:\…\python.exe)
-- ffmpeg 7.1 (winget) · yt-dlp 2026.x + deno · Whisper small sur CPU
-- Skill Claude Code : ~/.claude/skills/video-to-skill → /video-to-skill <URL>
-- Testé : autotest OK, téléchargement YouTube OK, transcription OK
-⚠ À savoir : <warnings éventuels, ex. Python 3.10>
+✔ video-to-skill installed (Python 3.12, C:\…\python.exe)
+- ffmpeg 7.1 (winget) · yt-dlp 2026.x + deno · Whisper small on CPU
+- Claude Code skill: ~/.claude/skills/video-to-skill → /video-to-skill <URL>
+- Tested: self-test OK, YouTube download OK, transcription OK
+⚠ Good to know: <warnings if any, e.g. Python 3.10>
 ```
 
 ---
 
-## Utiliser les scripts (référence rapide)
+## Using the scripts (quick reference)
 
 ```bash
-# Télécharger
-PY scripts/download.py URL [URL…] [--out downloads] [--lang fr] [--max-height 720]
-PY scripts/download.py --file urls.txt                     # une URL par ligne
-PY scripts/download.py URL --playlist --max-videos 20      # playlist / chaîne
-PY scripts/download.py URL --audio-only                    # audio seul, pour transcrire
-PY scripts/download.py URL --section 12:00-25:00           # un passage
-PY scripts/download.py URL --cookies-from-browser firefox  # âge / membres / « not a bot »
+# Download
+PY scripts/download.py URL [URL…] [--out downloads] [--lang en] [--max-height 720]
+PY scripts/download.py --file urls.txt                     # one URL per line
+PY scripts/download.py URL --playlist --max-videos 20      # playlist / channel
+PY scripts/download.py URL --audio-only                    # audio only, for transcription
+PY scripts/download.py URL --section 12:00-25:00           # one section
+PY scripts/download.py URL --cookies-from-browser firefox  # age / members-only / "not a bot"
 
-# Transformer une vidéo en matériau « regardable » (images clés + transcript)
-PY scripts/extract.py <URL ou fichier> --out v2s_work [--lang fr] [--whisper-model small] [--whisper-device cpu]
+# Turn a video into "watchable" material (key frames + transcript)
+PY scripts/extract.py <URL or file> --out v2s_work [--lang en] [--whisper-model small] [--whisper-device cpu]
 ```
-`download.py` imprime sur stdout une liste JSON : `url, ok, files, subtitles, info_json, title, duration, chapters, error, hint`. En cas d'échec, **lis `hint`** : il dit quoi faire (cookies, mise à jour, réseau…). yt-dlp est mis à jour et l'essai relancé automatiquement si YouTube a changé.
+`download.py` prints a JSON list on stdout: `url, ok, files, subtitles, info_json, title, duration, chapters, error, hint`. On failure, **read `hint`**: it says what to do (cookies, update, network…). yt-dlp is updated and the attempt retried automatically when YouTube has changed.
 
-Un fichier téléchargé par `download.py` peut être donné directement à `extract.py` : ses sous-titres et ses chapitres (`.info.json`) voisins sont repris automatiquement.
+A file downloaded by `download.py` can be passed straight to `extract.py`: its neighbouring subtitles and chapters (`.info.json`) are picked up automatically.
 
-### Choisir le modèle Whisper
+### Choosing the Whisper model
 
-| Modèle | Taille | Précision | Vitesse sur CPU | Usage |
+| Model | Size | Accuracy | CPU speed | Use |
 |---|---|---|---|---|
-| `tiny` | ~75 Mo | faible | très rapide | tests |
-| `base` | ~145 Mo | moyenne | rapide | brouillon |
-| `small` | ~480 Mo | bonne | correcte | **défaut**, bon compromis |
-| `medium` | ~1,5 Go | très bonne | lente | accents, jargon technique |
-| `turbo` | ~1,6 Go | très bonne | lente | GPU recommandé |
-| `large-v3` | ~3 Go | meilleure | très lente | GPU recommandé |
+| `tiny` | ~75 MB | low | very fast | tests |
+| `base` | ~145 MB | medium | fast | drafts |
+| `small` | ~480 MB | good | fair | **default**, good trade-off |
+| `medium` | ~1.5 GB | very good | slow | accents, technical jargon |
+| `turbo` | ~1.6 GB | very good | slow | GPU recommended |
+| `large-v3` | ~3 GB | best | very slow | GPU recommended |
 
-Un GPU NVIDIA (CUDA 12 + cuDNN 9) accélère fortement les gros modèles ; sans GPU, reste sur `small`.
+An NVIDIA GPU (CUDA 12 + cuDNN 9) speeds up the large models a lot; without a GPU, stay on `small`.
 
-### « Sign in to confirm you're not a bot » / vidéo soumise à l'âge
+### "Sign in to confirm you're not a bot" / age-restricted video
 
-Relance avec `--cookies-from-browser firefox` (ou `edge`, `chrome`, `brave`) en utilisant un navigateur **où le dev est connecté à YouTube**. Sous Windows, Chrome/Edge verrouillent et chiffrent leurs cookies tant qu'ils sont ouverts : Firefox est le plus fiable, sinon demande au dev de fermer le navigateur. Demande toujours l'accord du dev avant de lire les cookies de son navigateur.
+Rerun with `--cookies-from-browser firefox` (or `edge`, `chrome`, `brave`) using a browser **where the developer is signed in to YouTube**. On Windows, Chrome/Edge lock and encrypt their cookies while open: Firefox is the most reliable, otherwise ask the developer to close the browser. Always ask the developer before reading their browser cookies.
 
 ---
 
-## Règles pour l'agent
+## Rules for the agent
 
-- **Annonce** ce que tu installes avant de le faire (une phrase suffit).
-- Pas de `sudo`, pas de modification des réglages de sécurité, pas de désactivation TLS / antivirus. Si un droit admin est indispensable, **demande**.
-- Télécharge uniquement des vidéos que le développeur a le droit d'utiliser (apprentissage, documentation interne) ; ne redistribue pas les fichiers.
-- N'affiche ni ne copie de cookies, tokens ou mots de passe dans tes messages ou dans les fichiers du repo.
-- Si quelque chose a échoué ou n'a pas été vérifié, **dis-le** ; ne déclare pas « installé » sur la base d'un rapport `ok: false`.
+- **Announce** what you install before doing it (one sentence is enough).
+- No `sudo`, no changes to security settings, no disabling TLS / antivirus. If admin rights are truly needed, **ask**.
+- Only download videos the developer has the right to use (learning, internal documentation); do not redistribute the files.
+- Never display or copy cookies, tokens or passwords in your messages or in the repo's files.
+- If something failed or was not verified, **say so**; never declare "installed" based on an `ok: false` report.

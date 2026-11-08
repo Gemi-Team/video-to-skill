@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
 """
-assemble.py — dernière étape du mode vidéo longue : contrôle les notes des sous-agents,
-puis range leurs méthodes dans les fichiers de référence du skill final.
+assemble.py — last step of long-video mode: checks the sub-agents' notes,
+then files their methods into the reference files of the final skill.
 
-  python scripts/assemble.py v2s_work --check                  # notes complètes ? journal visuel ? citations ?
-  python scripts/assemble.py v2s_work --list                   # toutes les méthodes : id (P2.M7) + titre
-  python scripts/assemble.py v2s_work --plan-template          # brouillon de plan (JSON) à réorganiser par thème
-  python scripts/assemble.py v2s_work --plan v2s_work/plan.json --out skills_out/<nom>
+  python scripts/assemble.py v2s_work --check                  # notes complete? visual log? citations?
+  python scripts/assemble.py v2s_work --list                   # every method: id (P2.M7) + title
+  python scripts/assemble.py v2s_work --plan-template          # draft plan (JSON) to reorganise by theme
+  python scripts/assemble.py v2s_work --plan v2s_work/plan.json --out skills_out/<name>
 
-Plan (JSON écrit par l'orchestrateur, dans l'ordre logique d'application, pas l'ordre de la vidéo) :
+Plan (JSON written by the orchestrator, in the logical order of application, not the order of the video):
   {
-    "name": "<nom-du-skill>",
+    "name": "<skill-name>",
     "files": [
-      {"file": "01-positionnement", "title": "Positionnement et message",
-       "purpose": "Choisir ce pour quoi la marque est connue…", "methods": ["P1.M2", "P1.M4"]}
+      {"file": "01-positioning", "title": "Positioning and messaging",
+       "purpose": "Choose what the brand is known for…", "methods": ["P1.M2", "P1.M4"]}
     ],
-    "drop": {"P3.M3": "doublon de P2.M12 : fusionné à la main dans 04, section 4.7"}
+    "drop": {"P3.M3": "duplicate of P2.M12: merged by hand into 04, section 4.7"}
   }
-Chaque méthode est placée une seule fois, ou listée dans "drop" avec une raison (fusion, hors sujet).
-Sortie : <out>/references/NN-*.md (méthodes renumérotées N.k, horodatages normalisés)
-         + <out>/references/99-incertitudes-et-ignore.md.
-Restent à faire par l'orchestrateur : les fusions annoncées dans "drop", puis SKILL.md (voir SKILL.md du repo).
+Every method is placed exactly once, or listed in "drop" with a reason (merge, off-topic).
+Output: <out>/references/NN-*.md (methods renumbered N.k, timestamps normalized)
+        + <out>/references/99-uncertainties-and-skipped.md.
+Left to the orchestrator: the merges announced in "drop", then SKILL.md (see the repo's SKILL.md).
+
+Section headings are read in English (template) or French (notes written with an older template).
 """
 import argparse
 import json
@@ -31,7 +33,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import utf8_console  # noqa: E402
 
-REQUIRED = ["## Méthodes", "## Ignoré", "## Incertain", "## Journal visuel"]
+# heading → accepted spellings (English template first, French for older notes)
+SECTIONS = {
+    "methods": ["## Methods", "## Méthodes"],
+    "skipped": ["## Skipped", "## Ignoré"],
+    "uncertain": ["## Uncertain", "## Incertain"],
+    "visual_log": ["## Visual log", "## Journal visuel"],
+}
+COVERAGE = re.compile(r"(?:Visual coverage|Couverture visuelle)\s*:\s*(\d+)\s*/\s*(\d+)", re.I)
 CITE = re.compile(r"\[t=(\d+(?::\d{2}){1,2})")
 
 
@@ -43,7 +52,7 @@ def secs(ts):
 
 
 def norm(text):
-    """[2:00:05] → [t=2:00:05] (format oublié par certains agents) ; [t=0:02:50] → [t=2:50]."""
+    """[2:00:05] → [t=2:00:05] (format some agents forget); [t=0:02:50] → [t=2:50]."""
     text = re.sub(r"\[(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[–-]\s*\d{1,2}:\d{2}(?::\d{2})?)?)\]", r"[t=\1]", text)
     return re.sub(r"(?<=[=–-])0:(\d{2}):(\d{2})", lambda m: f"{int(m.group(1))}:{m.group(2)}", text)
 
@@ -52,7 +61,7 @@ def load(work):
     work = Path(work).resolve()
     pj = work / "parts.json"
     if not pj.exists():
-        sys.exit(f"{pj} introuvable : lance d'abord extract.py (vidéo longue) ou parts.py")
+        sys.exit(f"{pj} not found: run extract.py (long video) or parts.py first")
     parts = json.loads(pj.read_text(encoding="utf-8"))
     out = []
     for p in parts:
@@ -64,9 +73,13 @@ def load(work):
     return work, out
 
 
-def section(text, head):
-    m = re.search(rf"^{re.escape(head)}\s*\n(.*?)(?=^## |\Z)", text, re.S | re.M)
-    return m.group(1).strip() if m else None
+def section(text, key):
+    """Body of a section (any accepted spelling), or None if the heading is missing."""
+    for head in SECTIONS[key]:
+        m = re.search(rf"^{re.escape(head)}\s*\n(.*?)(?=^## |\Z)", text, re.S | re.M)
+        if m:
+            return m.group(1).strip()
+    return None
 
 
 def check(parts):
@@ -74,33 +87,33 @@ def check(parts):
     for p in parts:
         tag = p["dir"]
         if not p["text"].strip():
-            errors.append(f"{tag} : notes absentes ({p['notes']}) → relancer son sous-agent")
+            errors.append(f"{tag}: notes missing ({p['notes']}) → relaunch its sub-agent")
             continue
-        for h in REQUIRED:
-            if section(p["text"], h) is None:
-                errors.append(f"{tag} : section « {h} » manquante")
+        for key, heads in SECTIONS.items():
+            if section(p["text"], key) is None:
+                errors.append(f"{tag}: section \"{heads[0]}\" missing")
         if not p["methods"]:
-            warns.append(f"{tag} : aucune méthode (partie non instructive ? vérifier « Ignoré »)")
+            warns.append(f"{tag}: no method (non-instructional part? check \"Skipped\")")
         for m in p["methods"]:
             if not CITE.search(m["body"]):
-                errors.append(f"{tag} : {m['id']} « {m['title'][:50]} » sans citation [t=…]")
-        # citations hors de la plage de la partie (±90 s) → probable erreur d'horodatage
-        out = [c for c in CITE.findall(section(p["text"], "## Méthodes") or "")
+                errors.append(f"{tag}: {m['id']} \"{m['title'][:50]}\" has no [t=…] citation")
+        # citations outside the part's range (±90 s) → probably a wrong timestamp
+        out = [c for c in CITE.findall(section(p["text"], "methods") or "")
                if not (p["start"] - 90 <= secs(c) <= p["end"] + 90)]
         if out:
-            warns.append(f"{tag} : {len(out)} citation(s) hors de {p['from']}–{p['to']} (ex. {out[0]})")
-        # couverture visuelle : chaque planche doit apparaître dans le journal
-        journal = section(p["text"], "## Journal visuel") or ""
+            warns.append(f"{tag}: {len(out)} citation(s) outside {p['from']}–{p['to']} (e.g. {out[0]})")
+        # visual coverage: every contact sheet must appear in the log
+        journal = section(p["text"], "visual_log") or ""
         sheets = [Path(s).stem for s in p.get("sheets", [])]
         missing = [s for s in sheets if not re.search(rf"\b{s}\b", journal)]
         if missing:
-            errors.append(f"{tag} : journal visuel incomplet — {len(missing)}/{len(sheets)} planche(s) non décrite(s) "
-                          f"({', '.join(missing[:6])}{'…' if len(missing) > 6 else ''}) → relancer le sous-agent")
-        cov = re.search(r"Couverture visuelle\s*:\s*(\d+)\s*/\s*(\d+)", p["text"])
+            errors.append(f"{tag}: incomplete visual log — {len(missing)}/{len(sheets)} sheet(s) not described "
+                          f"({', '.join(missing[:6])}{'…' if len(missing) > 6 else ''}) → relaunch the sub-agent")
+        cov = COVERAGE.search(p["text"])
         if not cov:
-            warns.append(f"{tag} : ligne « Couverture visuelle : x/y » absente")
+            warns.append(f"{tag}: line \"Visual coverage: x/y\" missing")
         elif int(cov.group(1)) < int(cov.group(2)):
-            errors.append(f"{tag} : couverture visuelle déclarée {cov.group(1)}/{cov.group(2)} planches")
+            errors.append(f"{tag}: declared visual coverage {cov.group(1)}/{cov.group(2)} sheets")
     return errors, warns
 
 
@@ -112,10 +125,10 @@ def build(work, parts, plan_path, out):
     dup = sorted({m for m in placed if placed.count(m) > 1})
     missing = [m for m in by_id if m not in placed and m not in plan.get("drop", {})]
     if unknown or dup or missing:
-        sys.exit("Plan invalide :"
-                 + (f"\n  ids inconnus : {unknown}" if unknown else "")
-                 + (f"\n  placés deux fois : {dup}" if dup else "")
-                 + (f"\n  non placés (ajoute-les ou mets-les dans \"drop\" avec une raison) : {missing}" if missing else ""))
+        sys.exit("Invalid plan:"
+                 + (f"\n  unknown ids: {unknown}" if unknown else "")
+                 + (f"\n  placed twice: {dup}" if dup else "")
+                 + (f"\n  not placed (add them, or put them in \"drop\" with a reason): {missing}" if missing else ""))
     refs = Path(out) / "references"
     refs.mkdir(parents=True, exist_ok=True)
     written = []
@@ -123,22 +136,22 @@ def build(work, parts, plan_path, out):
         n = int(re.match(r"\d+", f["file"]).group(0)) if re.match(r"\d+", f["file"]) else i
         srcs = sorted({by_id[m][0]["n"] for m in f["methods"]})
         lines = [f"# {f['title']}", "", f.get("purpose", ""), "",
-                 f"Source : partie(s) {', '.join(map(str, srcs))} de la vidéo — citations `[t=…]` en temps de la vidéo complète.", ""]
+                 f"Source: part(s) {', '.join(map(str, srcs))} of the video — `[t=…]` citations in full-video time.", ""]
         for k, mid in enumerate(f["methods"], 1):
             p, m = by_id[mid]
             lines += [f"## {n}.{k} {m['title']}", f"<!-- src: {mid} -->", m["body"].strip(), ""]
         name = f["file"] if f["file"].endswith(".md") else f["file"] + ".md"
         (refs / name).write_text("\n".join(lines), encoding="utf-8")
         written.append((name, len(f["methods"])))
-    extra = ["# Incertitudes et passages ignorés", "",
-             "Relevés par les sous-agents. L'écran a primé sur la narration quand ils divergeaient.", "",
-             "## Incertitudes", ""]
+    extra = ["# Uncertainties and skipped segments", "",
+             "Reported by the sub-agents. The screen took precedence over the narration when they disagreed.", "",
+             "## Uncertainties", ""]
     for p in parts:
-        extra += [f"### Partie {p['n']} ({p['from']}–{p['to']})", section(p["text"], "## Incertain") or "_(rien)_", ""]
-    extra += ["## Passages ignorés (sans méthode)", ""]
+        extra += [f"### Part {p['n']} ({p['from']}–{p['to']})", section(p["text"], "uncertain") or "_(none)_", ""]
+    extra += ["## Skipped segments (no method)", ""]
     for p in parts:
-        extra += [f"### Partie {p['n']} ({p['from']}–{p['to']})", section(p["text"], "## Ignoré") or "_(rien)_", ""]
-    (refs / "99-incertitudes-et-ignore.md").write_text("\n".join(extra), encoding="utf-8")
+        extra += [f"### Part {p['n']} ({p['from']}–{p['to']})", section(p["text"], "skipped") or "_(none)_", ""]
+    (refs / "99-uncertainties-and-skipped.md").write_text("\n".join(extra), encoding="utf-8")
     return written, plan.get("drop", {})
 
 
@@ -157,12 +170,12 @@ def main():
     if a.check or not (a.list or a.plan_template or a.plan):
         errors, warns = check(parts)
         for p in parts:
-            print(f"  {p['dir']}  {p['from']}–{p['to']}  {len(p['methods'])} méthode(s)  {len(p.get('sheets', []))} planches")
+            print(f"  {p['dir']}  {p['from']}–{p['to']}  {len(p['methods'])} method(s)  {len(p.get('sheets', []))} sheets")
         for w in warns:
             print(f"  ⚠  {w}")
         for e in errors:
             print(f"  ✗  {e}")
-        print("ÉCHEC : corrige ou relance les sous-agents concernés" if errors else "OK : notes prêtes à assembler")
+        print("FAILED: fix or relaunch the sub-agents listed above" if errors else "OK: notes ready to assemble")
         sys.exit(1 if errors else 0)
     if a.list:
         for p in parts:
@@ -170,27 +183,27 @@ def main():
             for m in p["methods"]:
                 print(f"  {m['id']:<7} {m['title']}")
     if a.plan_template:
-        tpl = {"name": "<nom-du-skill>",
-               "files": [{"file": f"{p['n']:02d}-<theme>", "title": "<titre du thème>", "purpose": "<à quoi ça sert>",
+        tpl = {"name": "<skill-name>",
+               "files": [{"file": f"{p['n']:02d}-<theme>", "title": "<theme title>", "purpose": "<what it is for>",
                           "methods": [m["id"] for m in p["methods"]]} for p in parts],
                "drop": {}}
         print(json.dumps(tpl, ensure_ascii=False, indent=2))
     if a.plan:
         if not a.out:
-            sys.exit("--out requis avec --plan")
+            sys.exit("--out is required with --plan")
         errors, _ = check(parts)
         if errors:
-            sys.exit("Notes incomplètes : lance --check et corrige d'abord.\n" + "\n".join(errors))
+            sys.exit("Incomplete notes: run --check and fix them first.\n" + "\n".join(errors))
         written, drop = build(work, parts, a.plan, a.out)
         for name, n in written:
-            print(f"  ✔ references/{name}  ({n} méthodes)")
-        print("  ✔ references/99-incertitudes-et-ignore.md")
+            print(f"  ✔ references/{name}  ({n} methods)")
+        print("  ✔ references/99-uncertainties-and-skipped.md")
         if drop:
-            print("À faire à la main (fusions / exclusions annoncées dans le plan) :")
+            print("To do by hand (merges / exclusions announced in the plan):")
             for k, v in drop.items():
-                print(f"  - {k} : {v}")
-        print(f"Puis écris {Path(a.out) / 'SKILL.md'} (carte des méthodes, méthodes centrales, principes, source) "
-              f"et valide : python scripts/validate_skill.py {a.out}")
+                print(f"  - {k}: {v}")
+        print(f"Then write {Path(a.out) / 'SKILL.md'} (method map, core methods, principles, source) "
+              f"and validate: python scripts/validate_skill.py {a.out}")
 
 
 if __name__ == "__main__":

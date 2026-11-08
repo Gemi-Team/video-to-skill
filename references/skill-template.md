@@ -1,74 +1,74 @@
-# Modèle de skill généré
+# Generated skill template
 
-Copie ce squelette dans `<name>/SKILL.md` et adapte. Supprime les sections inutiles (ex. « Méthode » pour un pur tuto CLI).
+Copy this skeleton into `<name>/SKILL.md` and adapt it. Remove sections that do not apply (e.g. "Methods" for a pure CLI tutorial).
 
 ~~~markdown
 ---
-name: <kebab-case-court>
-description: <Ce que le skill permet de faire, en une phrase.> À utiliser quand <situations / phrases déclencheuses : « … », « … »>.
+name: <short-kebab-case>
+description: <What the skill lets you do, in one sentence.> Use when <situations / trigger phrases: "…", "…">.
 ---
 
-# <Titre orienté action>
+# <Action-oriented title>
 
-> Vérification : <N/M étapes exécutées avec succès le AAAA-MM-JJ | non vérifié par exécution> ;
-> <ce qui n'a pas pu être vérifié et pourquoi>.
+> Verification: <N/M steps executed successfully on YYYY-MM-DD | not verified by execution>;
+> <what could not be verified and why>.
 
-<1–2 phrases : ce qu'on obtient à la fin, pour qui.>
+<1–2 sentences: what you get at the end, for whom.>
 
-## Prérequis
-- <outil> <version vue à l'écran> [t=0:42]
-- <compte / accès / fichier nécessaire>
+## Prerequisites
+- <tool> <version seen on screen> [t=0:42]
+- <account / access / file needed>
 
-## Étapes   ← pour une procédure
+## Steps   ← for a procedure
 
-### 1. <Verbe + objet>
-<instruction impérative>
+### 1. <Verb + object>
+<imperative instruction>
 ```bash
-<commande exacte recopiée de l'écran>
+<exact command copied from the screen>
 ```
-✔ Réussite : <ce qui doit s'afficher / exister> [t=1:05]
+✔ Success: <what should be displayed / exist> [t=1:05]
 
 ### 2. …
-⚠ incertain : <ce qui n'est pas clair et pourquoi> [t=3:12]
-➕ ajouté : <étape absente de la vidéo mais nécessaire> (source : <doc officielle URL>)
+⚠ uncertain: <what is unclear and why> [t=3:12]
+➕ added: <step missing from the video but needed> (source: <official docs URL>)
 
-## Carte des méthodes   ← pour un cours / savoir-faire (surtout vidéo longue)
-| Problème / situation | Méthode | Détail |
+## Method map   ← for a course / know-how (especially long videos)
+| Problem / situation | Method | Details |
 |---|---|---|
-| <ce que l'utilisateur veut faire> | <nom de la méthode> | [references/01-<theme>.md](references/01-<theme>.md) |
+| <what the user wants to do> | <method name> | [references/01-<theme>.md](references/01-<theme>.md) |
 
-## Méthodes
-### <Nom actionnable : verbe + objet>
-- Quand l'utiliser : <situation>
-- Étapes : 1. … [t=…]  2. … [t=…]
-- Règles de décision : si … → … [t=…]
-- Pourquoi ça marche : … [t=…]
-- Exemple de la vidéo : … [t=…]
-- Erreurs à éviter : … — <raison> [t=…]
+## Methods
+### <Actionable name: verb + object>
+- When to use it: <situation>
+- Steps: 1. … [t=…]  2. … [t=…]
+- Decision rules: if … → … [t=…]
+- Why it works: … [t=…]
+- Example from the video: … [t=…]
+- Mistakes to avoid: … — <reason> [t=…]
 
-## Exemple travaillé
-<un exemple de la vidéo, refait pas à pas> [t=…]
+## Worked example
+<an example from the video, redone step by step> [t=…]
 
-## Variantes
-- <cas alternatif montré ou mentionné> [t=…]
+## Variants
+- <alternative case shown or mentioned> [t=…]
 
-## Dépannage
-- <symptôme> → <cause> → <correctif> [t=…]
+## Troubleshooting
+- <symptom> → <cause> → <fix> [t=…]
 
-## Pour aller plus loin
-- [Concepts](references/concepts.md) — théorie expliquée dans la vidéo
+## Going further
+- [Concepts](references/concepts.md) — theory explained in the video
 
 ## Source
-- Vidéo : « <titre> » — <chaîne/auteur>, <date> — <URL>
-- Transcription : <sous-titres manuels | auto | whisper small | aucune>
-- Extrait le <AAAA-MM-JJ> avec video-to-skill
+- Video: "<title>" — <channel/author>, <date> — <URL>
+- Transcript: <manual subtitles | auto-captions | whisper small | none>
+- Extracted on <YYYY-MM-DD> with video-to-skill
 ~~~
 
-## Bons et mauvais exemples
+## Good and bad examples
 
 | ❌ Narration | ✅ Instruction |
 |---|---|
-| « Alors là ce qu'on va faire c'est installer le truc » | « Installe le paquet : `pip install requests` [t=0:31] » |
-| « Il tape un truc genre sum » (audio) | « Saisis `=SUM(B3:B10)` dans B11 [t=2:14] » (écran) |
-| « Et voilà, ça marche ! » | « ✔ Réussite : le terminal affiche `200` » |
-| Étape inventée pour combler | `⚠ incertain : la vidéo coupe entre [t=4:01] et [t=4:20]` |
+| "So what we're gonna do now is install the thing" | "Install the package: `pip install requests` [t=0:31]" |
+| "He types something like sum" (audio) | "Enter `=SUM(B3:B10)` in B11 [t=2:14]" (screen) |
+| "And there you go, it works!" | "✔ Success: the terminal prints `200`" |
+| Step invented to fill a gap | `⚠ uncertain: the video cuts between [t=4:01] and [t=4:20]` |
